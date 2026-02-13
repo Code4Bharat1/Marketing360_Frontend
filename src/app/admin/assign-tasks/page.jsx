@@ -1,10 +1,10 @@
-import LoginPage from '@/components/loginpage/login'
+import AssignTasks from '@/components/Admin/AdminAssigntasks'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <LoginPage/>
+      <AssignTasks/>
     </div>
   )
 }

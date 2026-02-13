@@ -1,10 +1,10 @@
-import LoginPage from '@/components/loginpage/login'
+import AdminWorkLogs from '@/components/Admin/AdminWorklog'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <LoginPage/>
+      <AdminWorkLogs/>
     </div>
   )
 }

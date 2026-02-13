@@ -1,10 +1,10 @@
-import LoginPage from '@/components/loginpage/login'
+import EmployeeTasksView from '@/components/Employee/asssignedtasks'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <LoginPage/>
+      <EmployeeTasksView/>
     </div>
   )
 }

@@ -1,10 +1,10 @@
-import LoginPage from '@/components/loginpage/login'
+import ProfilePage from '@/components/Employee/Profilepage '
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <LoginPage/>
+      <ProfilePage/>
     </div>
   )
 }

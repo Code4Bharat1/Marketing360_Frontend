@@ -1,10 +1,11 @@
-import LoginPage from '@/components/loginpage/login'
+import DailyWorkLogs from '@/components/Employee/task'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-      <LoginPage/>
+        <DailyWorkLogs/>
+      
     </div>
   )
 }
