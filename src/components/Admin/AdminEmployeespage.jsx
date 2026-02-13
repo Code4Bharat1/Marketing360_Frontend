@@ -7,7 +7,7 @@ import {
     FiMapPin, FiCalendar, FiUsers, FiChevronLeft,
     FiChevronRight, FiAlertCircle, FiGrid, FiList,
     FiBriefcase, FiShield, FiUserCheck, FiUserX,
-    FiDownload, FiRefreshCw, FiLock, FiUnlock
+    FiDownload, FiRefreshCw, FiLock, FiUnlock, FiClock
 } from 'react-icons/fi';
 import AdminSidebar from './Admimsidebar';
 
@@ -25,6 +25,14 @@ const DEPT_COLORS = {
     Finance:     'bg-cyan-500',
 };
 
+const SHIFT_TYPES = ['Morning', 'Afternoon', 'Night', 'Flexible'];
+const SHIFT_COLORS = {
+    Morning:   'bg-amber-100 text-amber-700 border-amber-200',
+    Afternoon: 'bg-orange-100 text-orange-700 border-orange-200',
+    Night:     'bg-indigo-100 text-indigo-700 border-indigo-200',
+    Flexible:  'bg-purple-100 text-purple-700 border-purple-200',
+};
+
 const ROLE_OPTIONS   = ['Software Engineer', 'Senior Engineer', 'UI/UX Designer', 'Data Analyst', 'Operations Manager', 'Marketing Executive', 'QA Engineer', 'HR Executive', 'Finance Analyst', 'Team Lead', 'Project Manager'];
 const DEPT_OPTIONS   = Object.keys(DEPT_COLORS);
 const STATUS_OPTIONS = ['active', 'inactive'];
@@ -37,26 +45,26 @@ const STATUS_CFG = {
 const EMPTY_FORM = {
     name: '', email: '', phone: '', role: 'Software Engineer',
     dept: 'Engineering', location: 'Mumbai', joinDate: new Date().toISOString().split('T')[0],
-    status: 'active', avatar: '',
+    status: 'active', avatar: '', shiftType: 'Morning', shiftStart: '09:00', shiftEnd: '18:00',
 };
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
 const INITIAL_EMPLOYEES = [
-    { id: 1,  name: 'Rahul Sharma',   email: 'rahul.sharma@worktrack.in',   phone: '+91 98200 11111', role: 'Senior Engineer',      dept: 'Engineering', location: 'Mumbai',    joinDate: '2022-03-15', status: 'active',   avatar: 'RS', logsCount: 48, tasksCount: 12 },
-    { id: 2,  name: 'Priya Patel',    email: 'priya.patel@worktrack.in',    phone: '+91 98200 22222', role: 'UI/UX Designer',        dept: 'Design',      location: 'Bangalore', joinDate: '2022-07-01', status: 'active',   avatar: 'PP', logsCount: 39, tasksCount: 8  },
-    { id: 3,  name: 'Amit Kumar',     email: 'amit.kumar@worktrack.in',     phone: '+91 98200 33333', role: 'Data Analyst',          dept: 'Data',        location: 'Hyderabad', joinDate: '2021-11-20', status: 'active',   avatar: 'AK', logsCount: 52, tasksCount: 6  },
-    { id: 4,  name: 'Sneha Reddy',    email: 'sneha.reddy@worktrack.in',    phone: '+91 98200 44444', role: 'Software Engineer',     dept: 'Engineering', location: 'Pune',      joinDate: '2023-01-10', status: 'active',   avatar: 'SR', logsCount: 31, tasksCount: 9  },
-    { id: 5,  name: 'Vikram Singh',   email: 'vikram.singh@worktrack.in',   phone: '+91 98200 55555', role: 'Operations Manager',    dept: 'Operations',  location: 'Delhi',     joinDate: '2020-06-05', status: 'active',   avatar: 'VS', logsCount: 60, tasksCount: 7  },
-    { id: 6,  name: 'Meera Joshi',    email: 'meera.joshi@worktrack.in',    phone: '+91 98200 66666', role: 'Marketing Executive',   dept: 'Marketing',   location: 'Chennai',   joinDate: '2022-09-18', status: 'active',   avatar: 'MJ', logsCount: 44, tasksCount: 5  },
-    { id: 7,  name: 'Karan Mehta',    email: 'karan.mehta@worktrack.in',    phone: '+91 98200 77777', role: 'Software Engineer',     dept: 'Engineering', location: 'Mumbai',    joinDate: '2023-03-22', status: 'active',   avatar: 'KM', logsCount: 27, tasksCount: 11 },
-    { id: 8,  name: 'Divya Nair',     email: 'divya.nair@worktrack.in',     phone: '+91 98200 88888', role: 'QA Engineer',           dept: 'QA',          location: 'Bangalore', joinDate: '2022-05-30', status: 'active',   avatar: 'DN', logsCount: 36, tasksCount: 4  },
-    { id: 9,  name: 'Arjun Nair',     email: 'arjun.nair@worktrack.in',     phone: '+91 98200 99999', role: 'Senior Engineer',       dept: 'Engineering', location: 'Hyderabad', joinDate: '2021-08-14', status: 'active',   avatar: 'AN', logsCount: 55, tasksCount: 14 },
-    { id: 10, name: 'Kavya Iyer',     email: 'kavya.iyer@worktrack.in',     phone: '+91 98201 10000', role: 'UI/UX Designer',        dept: 'Design',      location: 'Pune',      joinDate: '2023-06-01', status: 'active',   avatar: 'KI', logsCount: 18, tasksCount: 3  },
-    { id: 11, name: 'Ravi Verma',     email: 'ravi.verma@worktrack.in',     phone: '+91 98201 11111', role: 'Operations Manager',    dept: 'Operations',  location: 'Delhi',     joinDate: '2020-02-28', status: 'inactive', avatar: 'RV', logsCount: 72, tasksCount: 0  },
-    { id: 12, name: 'Pooja Shah',     email: 'pooja.shah@worktrack.in',     phone: '+91 98201 12222', role: 'Marketing Executive',   dept: 'Marketing',   location: 'Mumbai',    joinDate: '2021-12-05', status: 'inactive', avatar: 'PS', logsCount: 43, tasksCount: 0  },
-    { id: 13, name: 'Nikhil Desai',   email: 'nikhil.desai@worktrack.in',   phone: '+91 98201 13333', role: 'Finance Analyst',       dept: 'Finance',     location: 'Ahmedabad', joinDate: '2022-04-11', status: 'active',   avatar: 'ND', logsCount: 29, tasksCount: 2  },
-    { id: 14, name: 'Anjali Gupta',   email: 'anjali.gupta@worktrack.in',   phone: '+91 98201 14444', role: 'HR Executive',          dept: 'HR',          location: 'Chennai',   joinDate: '2021-07-19', status: 'active',   avatar: 'AG', logsCount: 38, tasksCount: 1  },
-    { id: 15, name: 'Siddharth Rao',  email: 'siddharth.rao@worktrack.in',  phone: '+91 98201 15555', role: 'Team Lead',             dept: 'Engineering', location: 'Bangalore', joinDate: '2019-10-07', status: 'active',   avatar: 'SR', logsCount: 88, tasksCount: 18 },
+    { id: 1,  name: 'Rahul Sharma',   email: 'rahul.sharma@worktrack.in',   phone: '+91 98200 11111', role: 'Senior Engineer',      dept: 'Engineering', location: 'Mumbai',    joinDate: '2022-03-15', status: 'active',   avatar: 'RS', logsCount: 48, tasksCount: 12, shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 2,  name: 'Priya Patel',    email: 'priya.patel@worktrack.in',    phone: '+91 98200 22222', role: 'UI/UX Designer',        dept: 'Design',      location: 'Bangalore', joinDate: '2022-07-01', status: 'active',   avatar: 'PP', logsCount: 39, tasksCount: 8,  shiftType: 'Flexible',  shiftStart: '10:00', shiftEnd: '19:00' },
+    { id: 3,  name: 'Amit Kumar',     email: 'amit.kumar@worktrack.in',     phone: '+91 98200 33333', role: 'Data Analyst',          dept: 'Data',        location: 'Hyderabad', joinDate: '2021-11-20', status: 'active',   avatar: 'AK', logsCount: 52, tasksCount: 6,  shiftType: 'Morning',   shiftStart: '08:30', shiftEnd: '17:30' },
+    { id: 4,  name: 'Sneha Reddy',    email: 'sneha.reddy@worktrack.in',    phone: '+91 98200 44444', role: 'Software Engineer',     dept: 'Engineering', location: 'Pune',      joinDate: '2023-01-10', status: 'active',   avatar: 'SR', logsCount: 31, tasksCount: 9,  shiftType: 'Afternoon', shiftStart: '13:00', shiftEnd: '22:00' },
+    { id: 5,  name: 'Vikram Singh',   email: 'vikram.singh@worktrack.in',   phone: '+91 98200 55555', role: 'Operations Manager',    dept: 'Operations',  location: 'Delhi',     joinDate: '2020-06-05', status: 'active',   avatar: 'VS', logsCount: 60, tasksCount: 7,  shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 6,  name: 'Meera Joshi',    email: 'meera.joshi@worktrack.in',    phone: '+91 98200 66666', role: 'Marketing Executive',   dept: 'Marketing',   location: 'Chennai',   joinDate: '2022-09-18', status: 'active',   avatar: 'MJ', logsCount: 44, tasksCount: 5,  shiftType: 'Flexible',  shiftStart: '10:00', shiftEnd: '19:00' },
+    { id: 7,  name: 'Karan Mehta',    email: 'karan.mehta@worktrack.in',    phone: '+91 98200 77777', role: 'Software Engineer',     dept: 'Engineering', location: 'Mumbai',    joinDate: '2023-03-22', status: 'active',   avatar: 'KM', logsCount: 27, tasksCount: 11, shiftType: 'Night',     shiftStart: '22:00', shiftEnd: '07:00' },
+    { id: 8,  name: 'Divya Nair',     email: 'divya.nair@worktrack.in',     phone: '+91 98200 88888', role: 'QA Engineer',           dept: 'QA',          location: 'Bangalore', joinDate: '2022-05-30', status: 'active',   avatar: 'DN', logsCount: 36, tasksCount: 4,  shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 9,  name: 'Arjun Nair',     email: 'arjun.nair@worktrack.in',     phone: '+91 98200 99999', role: 'Senior Engineer',       dept: 'Engineering', location: 'Hyderabad', joinDate: '2021-08-14', status: 'active',   avatar: 'AN', logsCount: 55, tasksCount: 14, shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 10, name: 'Kavya Iyer',     email: 'kavya.iyer@worktrack.in',     phone: '+91 98201 10000', role: 'UI/UX Designer',        dept: 'Design',      location: 'Pune',      joinDate: '2023-06-01', status: 'active',   avatar: 'KI', logsCount: 18, tasksCount: 3,  shiftType: 'Afternoon', shiftStart: '14:00', shiftEnd: '23:00' },
+    { id: 11, name: 'Ravi Verma',     email: 'ravi.verma@worktrack.in',     phone: '+91 98201 11111', role: 'Operations Manager',    dept: 'Operations',  location: 'Delhi',     joinDate: '2020-02-28', status: 'inactive', avatar: 'RV', logsCount: 72, tasksCount: 0,  shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 12, name: 'Pooja Shah',     email: 'pooja.shah@worktrack.in',     phone: '+91 98201 12222', role: 'Marketing Executive',   dept: 'Marketing',   location: 'Mumbai',    joinDate: '2021-12-05', status: 'inactive', avatar: 'PS', logsCount: 43, tasksCount: 0,  shiftType: 'Flexible',  shiftStart: '10:00', shiftEnd: '19:00' },
+    { id: 13, name: 'Nikhil Desai',   email: 'nikhil.desai@worktrack.in',   phone: '+91 98201 13333', role: 'Finance Analyst',       dept: 'Finance',     location: 'Ahmedabad', joinDate: '2022-04-11', status: 'active',   avatar: 'ND', logsCount: 29, tasksCount: 2,  shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 14, name: 'Anjali Gupta',   email: 'anjali.gupta@worktrack.in',   phone: '+91 98201 14444', role: 'HR Executive',          dept: 'HR',          location: 'Chennai',   joinDate: '2021-07-19', status: 'active',   avatar: 'AG', logsCount: 38, tasksCount: 1,  shiftType: 'Morning',   shiftStart: '09:00', shiftEnd: '18:00' },
+    { id: 15, name: 'Siddharth Rao',  email: 'siddharth.rao@worktrack.in',  phone: '+91 98201 15555', role: 'Team Lead',             dept: 'Engineering', location: 'Bangalore', joinDate: '2019-10-07', status: 'active',   avatar: 'SR', logsCount: 88, tasksCount: 18, shiftType: 'Flexible',  shiftStart: '10:00', shiftEnd: '19:00' },
 ];
 
 function formatDate(d) {
@@ -67,6 +75,14 @@ function getInitials(name) {
 }
 function avatarColor(dept) {
     return DEPT_COLORS[dept] || 'bg-teal-500';
+}
+function formatTime(time) {
+    if (!time) return '';
+    const [h, m] = time.split(':');
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${m} ${ampm}`;
 }
 
 // ── Form field component ─────────────────────────────────────────────────────
@@ -131,6 +147,7 @@ export default function EmployeesPage() {
             name: emp.name, email: emp.email, phone: emp.phone,
             role: emp.role, dept: emp.dept, location: emp.location,
             joinDate: emp.joinDate, status: emp.status, avatar: emp.avatar,
+            shiftType: emp.shiftType, shiftStart: emp.shiftStart, shiftEnd: emp.shiftEnd,
         });
         setEditEmp(emp); setFormError(''); setShowForm(true); setViewEmp(null);
     };
@@ -192,10 +209,10 @@ export default function EmployeesPage() {
                         <h1 className="text-lg font-bold text-gray-800">Employees</h1>
                         <p className="text-xs text-gray-400">Manage your team members and their profiles</p>
                     </div>
-                    <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                         <FiBell className="w-4 h-4 text-gray-600" />
                         <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
-                    </button>
+                    </button> */}
                     <button onClick={openCreate}
                         className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">
                         <FiPlus className="w-4 h-4" /> Add Employee
@@ -214,9 +231,9 @@ export default function EmployeesPage() {
                                 <p className="text-teal-100 text-sm mt-1">View, add and manage all employees across departments</p>
                             </div>
                             <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                                <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                {/* <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                                     <FiDownload className="w-4 h-4" /> Export
-                                </button>
+                                </button> */}
                                 <button onClick={() => setEmployees(INITIAL_EMPLOYEES)} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                                     <FiRefreshCw className="w-4 h-4" /> Reset
                                 </button>
@@ -303,8 +320,8 @@ export default function EmployeesPage() {
                                                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Employee</th>
                                                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                                                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Department</th>
+                                                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Shift</th>
                                                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Location</th>
-                                                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Joined</th>
                                                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                                                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                                             </tr>
@@ -339,10 +356,18 @@ export default function EmployeesPage() {
                                                         </span>
                                                     </td>
                                                     <td className="px-4 py-3.5">
-                                                        <p className="text-xs text-gray-500 flex items-center gap-1"><FiMapPin className="w-3 h-3" />{emp.location}</p>
+                                                        <div>
+                                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SHIFT_COLORS[emp.shiftType]}`}>
+                                                                {emp.shiftType}
+                                                            </span>
+                                                            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                                                <FiClock className="w-3 h-3" />
+                                                                {formatTime(emp.shiftStart)} - {formatTime(emp.shiftEnd)}
+                                                            </p>
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3.5">
-                                                        <p className="text-xs text-gray-500 flex items-center gap-1"><FiCalendar className="w-3 h-3" />{formatDate(emp.joinDate)}</p>
+                                                        <p className="text-xs text-gray-500 flex items-center gap-1"><FiMapPin className="w-3 h-3" />{emp.location}</p>
                                                     </td>
                                                     <td className="px-4 py-3.5">
                                                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_CFG[emp.status].pill}`}>
@@ -406,6 +431,19 @@ export default function EmployeesPage() {
                                                             <span className={`w-2 h-2 rounded-full ${avatarColor(emp.dept)}`} />
                                                             {emp.dept}
                                                         </span>
+                                                    </div>
+
+                                                    {/* Shift info */}
+                                                    <div className="bg-gray-50 rounded-lg p-2.5 mb-3 border border-gray-100">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SHIFT_COLORS[emp.shiftType]}`}>
+                                                                {emp.shiftType}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-gray-600 flex items-center gap-1.5">
+                                                            <FiClock className="w-3 h-3" />
+                                                            {formatTime(emp.shiftStart)} - {formatTime(emp.shiftEnd)}
+                                                        </p>
                                                     </div>
 
                                                     {/* Contact */}
@@ -512,32 +550,62 @@ export default function EmployeesPage() {
                                 </Field>
                             </div>
 
-                            {/* Join Date + Status */}
+                            {/* Shift Type + Join Date */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Field label="Shift Type" required>
+                                    <select value={form.shiftType} onChange={e => setForm(f => ({...f, shiftType: e.target.value}))} className={inp + ' appearance-none cursor-pointer'}>
+                                        {SHIFT_TYPES.map(s => <option key={s}>{s}</option>)}
+                                    </select>
+                                </Field>
                                 <Field label="Joining Date" required>
                                     <input type="date" value={form.joinDate} onChange={e => setForm(f => ({...f, joinDate: e.target.value}))} className={inp} />
                                 </Field>
-                                <Field label="Status">
-                                    <div className="flex gap-3 pt-1">
-                                        {STATUS_OPTIONS.map(s => (
-                                            <button key={s} type="button" onClick={() => setForm(f => ({...f, status: s}))}
-                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg border transition-all capitalize ${form.status === s ? STATUS_CFG[s].pill : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}>
-                                                <span className={`w-2 h-2 rounded-full ${STATUS_CFG[s].dot}`} />{STATUS_CFG[s].label}
-                                            </button>
-                                        ))}
-                                    </div>
+                            </div>
+
+                            {/* Shift Timings */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Field label="Shift Start Time" required>
+                                    <input type="time" value={form.shiftStart} onChange={e => setForm(f => ({...f, shiftStart: e.target.value}))} className={inp} />
+                                </Field>
+                                <Field label="Shift End Time" required>
+                                    <input type="time" value={form.shiftEnd} onChange={e => setForm(f => ({...f, shiftEnd: e.target.value}))} className={inp} />
                                 </Field>
                             </div>
 
-                            {/* Dept color preview */}
-                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl ${avatarColor(form.dept)} flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0`}>
-                                    {form.name ? getInitials(form.name) : '??'}
+                            {/* Status */}
+                            <Field label="Status">
+                                <div className="flex gap-3 pt-1">
+                                    {STATUS_OPTIONS.map(s => (
+                                        <button key={s} type="button" onClick={() => setForm(f => ({...f, status: s}))}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg border transition-all capitalize ${form.status === s ? STATUS_CFG[s].pill : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}>
+                                            <span className={`w-2 h-2 rounded-full ${STATUS_CFG[s].dot}`} />{STATUS_CFG[s].label}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-gray-800">{form.name || 'Employee Name'}</p>
-                                    <p className="text-xs text-gray-500">{form.role} · {form.dept}</p>
-                                    <p className="text-xs text-gray-400">{form.email || 'email@worktrack.in'}</p>
+                            </Field>
+
+                            {/* Preview card */}
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                <div className="flex items-center gap-4 mb-3">
+                                    <div className={`w-12 h-12 rounded-2xl ${avatarColor(form.dept)} flex items-center justify-center text-white text-sm font-bold shadow-md flex-shrink-0`}>
+                                        {form.name ? getInitials(form.name) : '??'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-gray-800">{form.name || 'Employee Name'}</p>
+                                        <p className="text-xs text-gray-500">{form.role} · {form.dept}</p>
+                                        <p className="text-xs text-gray-400">{form.email || 'email@worktrack.in'}</p>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-lg p-2.5 border border-gray-200">
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SHIFT_COLORS[form.shiftType]}`}>
+                                            {form.shiftType} Shift
+                                        </span>
+                                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                                            <FiClock className="w-3 h-3" />
+                                            {formatTime(form.shiftStart)} - {formatTime(form.shiftEnd)}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -600,6 +668,32 @@ export default function EmployeesPage() {
                                         <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* Shift Information */}
+                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                                        <FiClock className="w-3.5 h-3.5" />
+                                        Shift Schedule
+                                    </p>
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${SHIFT_COLORS[viewEmp.shiftType]}`}>
+                                        {viewEmp.shiftType}
+                                    </span>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 border border-gray-200">
+                                    <div className="flex items-center justify-center gap-3">
+                                        <div className="text-center">
+                                            <p className="text-xs text-gray-400 mb-1">Start</p>
+                                            <p className="text-lg font-bold text-gray-800">{formatTime(viewEmp.shiftStart)}</p>
+                                        </div>
+                                        <div className="w-8 h-0.5 bg-gray-300 rounded"></div>
+                                        <div className="text-center">
+                                            <p className="text-xs text-gray-400 mb-1">End</p>
+                                            <p className="text-lg font-bold text-gray-800">{formatTime(viewEmp.shiftEnd)}</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Contact info */}

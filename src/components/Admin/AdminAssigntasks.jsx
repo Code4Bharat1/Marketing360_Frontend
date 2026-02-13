@@ -207,10 +207,10 @@ export default function AssignTasks() {
                         <h1 className="text-lg font-bold text-gray-800">Assign Tasks</h1>
                         <p className="text-xs text-gray-400">Create, assign and track employee tasks</p>
                     </div>
-                    <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                         <FiBell className="w-4 h-4 text-gray-600" />
                         <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
-                    </button>
+                    </button> */}
                     <button onClick={openCreate}
                         className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">
                         <FiPlus className="w-4 h-4" /> New Task

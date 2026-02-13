@@ -7,10 +7,26 @@ import { toast } from 'react-toastify';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@marketing360.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // User credentials database (in real app, this would be an API call)
+  const users = {
+    admin: {
+      email: 'admin@marketing360.com',
+      password: 'admin123',
+      role: 'admin',
+      name: 'Admin User',
+    },
+    employee: {
+      email: 'employee@marketing360.com',
+      password: 'employee123',
+      role: 'employee',
+      name: 'Employee User',
+    },
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,10 +36,18 @@ export default function LoginPage() {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Example validation
-      if (email === 'admin@marketing360.com' && password === 'admin123') {
+      // Find matching user
+      let authenticatedUser = null;
+      
+      if (email === users.admin.email && password === users.admin.password) {
+        authenticatedUser = users.admin;
+      } else if (email === users.employee.email && password === users.employee.password) {
+        authenticatedUser = users.employee;
+      }
+
+      if (authenticatedUser) {
         // Success - Login successful
-        toast.success('Login successful! Redirecting...', {
+        toast.success(`Welcome back, ${authenticatedUser.name}!`, {
           position: 'top-right',
           autoClose: 2000,
           hideProgressBar: false,
@@ -32,13 +56,19 @@ export default function LoginPage() {
           draggable: true,
         });
 
-        // Store auth token (example)
+        // Store auth information
         localStorage.setItem('authToken', 'demo-token-12345');
         localStorage.setItem('userEmail', email);
+        localStorage.setItem('userRole', authenticatedUser.role);
+        localStorage.setItem('userName', authenticatedUser.name);
 
-        // Redirect to dashboard after short delay
+        // Redirect based on role after short delay
         setTimeout(() => {
-          router.push('/employee/dashboard');
+          if (authenticatedUser.role === 'admin') {
+            router.push('/admin/dashboard');
+          } else if (authenticatedUser.role === 'employee') {
+            router.push('/employee/dashboard');
+          }
         }, 500);
 
       } else {
@@ -74,6 +104,13 @@ export default function LoginPage() {
     });
   };
 
+  // Quick login buttons for demo
+  const quickLogin = (userType) => {
+    const user = users[userType];
+    setEmail(user.email);
+    setPassword(user.password);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
       {/* Background decoration */}
@@ -96,11 +133,7 @@ export default function LoginPage() {
           </div>
 
           {/* Demo Credentials Info */}
-          {/* <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-            <p className="text-xs text-blue-800 font-medium mb-1">Demo Credentials:</p>
-            <p className="text-xs text-blue-600">Email: admin@marketing360.com</p>
-            <p className="text-xs text-blue-600">Password: admin123</p>
-          </div> */}
+          
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -157,8 +190,19 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Forgot Password */}
-            <div className="flex items-center justify-end">
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
+                  Remember me
+                </label>
+              </div>
               <a 
                 href="#" 
                 onClick={handleForgotPassword}

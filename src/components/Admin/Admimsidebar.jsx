@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useState } from 'react';
 import {
     FiBarChart2, FiFileText, FiUsers, FiActivity,
     FiSettings, FiLogOut, FiCheckSquare
@@ -9,28 +10,27 @@ import {
 import { BiPackage } from 'react-icons/bi';
 
 const navItems = [
-    { key: 'dashboard', label: 'Dashboard', icon: FiBarChart2, badge: null },
-    { key: 'work', label: 'Work Logs', icon: FiFileText, badge: 3 },
-    { key: 'assign-tasks', label: 'Assign Tasks', icon: FiCheckSquare, badge: null },
-    { key: 'employees', label: 'Employees', icon: FiUsers, badge: null },
-    // { key: 'reports', label: 'Reports', icon: FiActivity, badge: null },
-    // { key: 'settings', label: 'Settings', icon: FiSettings, badge: null },
+    { key: 'dashboard',    label: 'Dashboard',   icon: FiBarChart2,   href: '/admin/dashboard',   badge: null },
+    { key: 'work',         label: 'Work Logs',   icon: FiFileText,    href: '/admin/work',         badge: 3    },
+    { key: 'assign-tasks', label: 'Assign Tasks',icon: FiCheckSquare, href: '/admin/assign-tasks', badge: null },
+    { key: 'employees',    label: 'Employees',   icon: FiUsers,       href: '/admin/employees',    badge: null },
+    // { key: 'reports',   label: 'Reports',     icon: FiActivity,    href: '/admin/reports',      badge: null },
+    // { key: 'settings',  label: 'Settings',    icon: FiSettings,    href: '/admin/settings',     badge: null },
 ];
 
-export default function AdminSidebar({
-    activeNav = 'dashboard',
-    onNavigate,
-    collapsed = false,
-    onToggle
-}) {
+export default function AdminSidebar({ collapsed = false, onToggle }) {
+    const pathname = usePathname();   // ← current URL auto detect
+    const router   = useRouter();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+    // ✅ Active check: exact match OR nested route
+    // e.g. /admin/work  or  /admin/work/123  both highlight "Work Logs"
+    const isActive = (href) =>
+        pathname === href || pathname.startsWith(href + '/');
 
     const handleLogout = () => {
         setShowLogoutModal(false);
-        // 👉 Yahan apna actual logout logic add karo
-        // example:
-        router.push('/');
-        console.log('Logged out');
+        router.push('/');           // ← apna actual logout route yahan daalo
     };
 
     return (
@@ -45,55 +45,58 @@ export default function AdminSidebar({
             >
                 {/* ── Logo ── */}
                 <div className="h-16 flex items-center px-4 border-b border-gray-200 gap-3 overflow-hidden flex-shrink-0">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-md">
+                    <Link href="/admin/dashboard" className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-md flex-shrink-0 hover:opacity-90 transition-opacity">
                         <BiPackage className="w-4 h-4 text-white" />
-                    </div>
+                    </Link>
                     {!collapsed && (
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-800 truncate">WorkTrack</p>
+                        <Link href="/admin/dashboard" className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-800 truncate">Marketing360</p>
                             <p className="text-xs text-gray-400">Admin Panel</p>
-                        </div>
+                        </Link>
                     )}
                 </div>
 
                 {/* ── Nav ── */}
-                <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
-                    {navItems.map(({ key, label, icon: Icon, badge }) => {
-                        const isActive = activeNav === key;
+                <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto overflow-x-hidden">
+                    {navItems.map(({ key, label, icon: Icon, href, badge }) => {
+                        const active = isActive(href); // ✅ URL se auto detect
 
                         return (
                             <Link
                                 key={key}
-                                href={`/admin/${key}`}
-                                onClick={() => onNavigate?.(key)}
+                                href={href}
+                                title={collapsed ? label : undefined}
                                 className={`
                                     relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                                     transition-all duration-150 text-sm font-medium
-                                    ${isActive
+                                    ${active
                                         ? 'bg-teal-50 text-teal-700 border border-teal-100 shadow-sm'
-                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800 border border-transparent'
                                     }
                                 `}
                             >
-                                <Icon className={`w-4 h-4 ${isActive ? 'text-teal-600' : ''}`} />
+                                <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-teal-600' : ''}`} />
 
                                 {!collapsed && (
                                     <>
-                                        <span className="flex-1 truncate">{label}</span>
+                                        <span className="flex-1 truncate text-left">{label}</span>
                                         {badge !== null && (
-                                            <span
-                                                className={`
-                                                    text-xs font-bold px-1.5 py-0.5 rounded-full
-                                                    ${isActive
-                                                        ? 'bg-teal-100 text-teal-700'
-                                                        : 'bg-yellow-100 text-yellow-700'
-                                                    }
-                                                `}
-                                            >
+                                            <span className={`
+                                                text-xs font-bold px-1.5 py-0.5 rounded-full ml-auto
+                                                ${active
+                                                    ? 'bg-teal-100 text-teal-700'
+                                                    : 'bg-yellow-100 text-yellow-700'
+                                                }
+                                            `}>
                                                 {badge}
                                             </span>
                                         )}
                                     </>
+                                )}
+
+                                {/* Collapsed badge dot */}
+                                {collapsed && badge !== null && (
+                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-yellow-400 rounded-full border border-white" />
                                 )}
                             </Link>
                         );
@@ -101,29 +104,25 @@ export default function AdminSidebar({
                 </nav>
 
                 {/* ── User / Logout ── */}
-                <div className="p-3 border-t border-gray-200">
+                <div className="p-3 border-t border-gray-200 flex-shrink-0">
                     {!collapsed ? (
                         <div
-                            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-gray-50 cursor-pointer group"
                             onClick={() => setShowLogoutModal(true)}
+                            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group"
                         >
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                                 A
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-gray-800 truncate">
-                                    Admin User
-                                </p>
-                                <p className="text-xs text-gray-400 truncate">
-                                    admin@worktrack.in
-                                </p>
+                                <p className="text-xs font-semibold text-gray-800 truncate">Admin User</p>
+                                <p className="text-xs text-gray-400 truncate">admin@worktrack.in</p>
                             </div>
-                            <FiLogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors" />
+                            <FiLogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors flex-shrink-0" />
                         </div>
                     ) : (
                         <div
-                            className="flex justify-center cursor-pointer"
                             onClick={() => setShowLogoutModal(true)}
+                            className="flex justify-center cursor-pointer"
                         >
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold">
                                 A
@@ -135,25 +134,23 @@ export default function AdminSidebar({
 
             {/* ── Logout Confirmation Modal ── */}
             {showLogoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white rounded-xl w-full max-w-sm p-5 shadow-lg">
-                        <h3 className="text-sm font-semibold text-gray-800">
-                            Confirm Logout
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Are you sure you want to logout?
-                        </p>
-
-                        <div className="flex justify-end gap-2 mt-5">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                            <FiLogOut className="w-5 h-5 text-red-500" />
+                        </div>
+                        <h3 className="text-base font-bold text-gray-800 text-center">Confirm Logout</h3>
+                        <p className="text-xs text-gray-500 mt-1 text-center">Are you sure you want to logout?</p>
+                        <div className="flex gap-3 mt-5">
                             <button
                                 onClick={() => setShowLogoutModal(false)}
-                                className="px-4 py-1.5 text-xs rounded-lg border text-gray-600 hover:bg-gray-50"
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg border-2 border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleLogout}
-                                className="px-4 py-1.5 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600"
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-md"
                             >
                                 Logout
                             </button>

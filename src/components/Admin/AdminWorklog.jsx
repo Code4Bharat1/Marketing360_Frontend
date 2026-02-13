@@ -164,10 +164,10 @@ export default function AdminWorkLogs() {
                         <h1 className="text-lg font-bold text-gray-800">Work Logs</h1>
                         <p className="text-xs text-gray-400">Review and manage all employee daily logs</p>
                     </div>
-                    <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                         <FiBell className="w-4 h-4 text-gray-600" />
                         {pending > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />}
-                    </button>
+                    </button> */}
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold">A</div>
                 </header>
 
@@ -182,9 +182,9 @@ export default function AdminWorkLogs() {
                                 <p className="text-teal-100 text-sm mt-1">Review, approve, or reject employee daily submissions</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                {/* <button className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                                     <FiDownload className="w-4 h-4" /> Export CSV
-                                </button>
+                                </button> */}
                                 <button onClick={() => setLogs(INITIAL_LOGS)} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                                     <FiRefreshCw className="w-4 h-4" /> Refresh
                                 </button>

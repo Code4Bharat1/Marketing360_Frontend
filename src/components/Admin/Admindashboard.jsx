@@ -34,6 +34,7 @@ const statusCfg = {
 
 export default function AdminDashboard() {
     const [logs, setLogs] = useState(ALL_LOGS);
+    const [collapsed, setCollapsed]       = useState(false);
     const [viewLog, setViewLog] = useState(null);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -91,7 +92,7 @@ export default function AdminDashboard() {
         <div className="flex h-screen bg-gray-50 font-sans overflow-hidden text-black">
 
             {/* ════ SIDEBAR ════ */}
-          <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentPage="dashboard" />
+         <AdminSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
             {/* ════ MAIN ════ */}
             <div className="flex-1 flex flex-col overflow-hidden">
 
@@ -104,10 +105,10 @@ export default function AdminDashboard() {
                         <h1 className="text-lg font-bold text-gray-800">Admin Dashboard</h1>
                         <p className="text-xs text-gray-400">Thursday, Feb 13 2025</p>
                     </div>
-                    <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                         <FiBell className="w-4 h-4 text-gray-600" />
                         <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                    </button>
+                    </button> */}
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold">A</div>
                 </header>
 
