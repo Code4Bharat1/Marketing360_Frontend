@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, Package } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { login } from '../../services/authService';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,42 +13,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // User credentials database (in real app, this would be an API call)
-  const users = {
-    admin: {
-      email: 'admin@marketing360.com',
-      password: 'admin123',
-      role: 'admin',
-      name: 'Admin User',
-    },
-    employee: {
-      email: 'employee@marketing360.com',
-      password: 'employee123',
-      role: 'employee',
-      name: 'Employee User',
-    },
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call backend API
+      const response = await login(email, password);
 
-      // Find matching user
-      let authenticatedUser = null;
-      
-      if (email === users.admin.email && password === users.admin.password) {
-        authenticatedUser = users.admin;
-      } else if (email === users.employee.email && password === users.employee.password) {
-        authenticatedUser = users.employee;
-      }
-
-      if (authenticatedUser) {
+      if (response.success) {
         // Success - Login successful
-        toast.success(`Welcome back, ${authenticatedUser.name}!`, {
+        const user = response.data;
+        
+        toast.success(`Welcome back, ${user.name || user.email}!`, {
           position: 'top-right',
           autoClose: 2000,
           hideProgressBar: false,
@@ -56,29 +34,32 @@ export default function LoginPage() {
           draggable: true,
         });
 
-        // Store auth information
-        localStorage.setItem('authToken', 'demo-token-12345');
-        localStorage.setItem('userEmail', email);
-        localStorage.setItem('userRole', authenticatedUser.role);
-        localStorage.setItem('userName', authenticatedUser.name);
-
         // Redirect based on role after short delay
         setTimeout(() => {
-          if (authenticatedUser.role === 'admin') {
+          if (user.role === 'admin' || user.role === 'manager') {
             router.push('/admin/dashboard');
-          } else if (authenticatedUser.role === 'employee') {
+          } else if (user.role === 'employee') {
             router.push('/employee/dashboard');
+          } else {
+            // Default redirect
+            router.push('/dashboard');
           }
         }, 500);
-
-      } else {
-        // Error - Invalid credentials
-        throw new Error('Invalid email or password');
       }
 
     } catch (error) {
       setIsLoading(false);
-      toast.error(error.message || 'Login failed. Please try again.', {
+      
+      // Handle different error types
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      toast.error(errorMessage, {
         position: 'top-right',
         autoClose: 3000,
         hideProgressBar: false,
@@ -104,11 +85,15 @@ export default function LoginPage() {
     });
   };
 
-  // Quick login buttons for demo
+  // Quick login helper for demo (optional - remove in production)
   const quickLogin = (userType) => {
-    const user = users[userType];
-    setEmail(user.email);
-    setPassword(user.password);
+    if (userType === 'admin') {
+      setEmail('admin@marketing360.com');
+      setPassword('admin123');
+    } else if (userType === 'employee') {
+      setEmail('employee@marketing360.com');
+      setPassword('employee123');
+    }
   };
 
   return (
@@ -132,8 +117,28 @@ export default function LoginPage() {
             <p className="text-slate-500 text-sm">Sign in to your account</p>
           </div>
 
-          {/* Demo Credentials Info */}
-          
+          {/* Demo Credentials Info - Optional: Remove in production */}
+          {/* {process.env.NODE_ENV === 'development' && (
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-xs font-medium text-emerald-800 mb-2">Demo Credentials:</p>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => quickLogin('admin')}
+                  className="block w-full text-left text-xs text-emerald-700 hover:text-emerald-900 transition-colors"
+                >
+                  <span className="font-semibold">Admin:</span> admin@marketing360.com / admin123
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quickLogin('employee')}
+                  className="block w-full text-left text-xs text-emerald-700 hover:text-emerald-900 transition-colors"
+                >
+                  <span className="font-semibold">Employee:</span> employee@marketing360.com / employee123
+                </button>
+              </div>
+            </div>
+          )} */}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,27 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     FiUsers, FiFileText, FiCheckCircle, FiXCircle, FiClock,
-    FiTrendingUp, FiSun, FiMoon, FiCalendar, FiSearch,
+    FiSun, FiMoon, FiCalendar, FiSearch,
     FiFilter, FiEye, FiCheck, FiX, FiChevronLeft, FiChevronRight,
-    FiBell, FiSettings, FiLogOut, FiBarChart2, FiActivity,
     FiAlertCircle, FiDownload, FiRefreshCw, FiMenu
 } from 'react-icons/fi';
-import { BiPackage } from 'react-icons/bi';
 import AdminSidebar from './Admimsidebar';
-
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-const ALL_LOGS = [
-    { id: 1, employee: 'Rahul Sharma', avatar: 'RS', dept: 'Engineering', date: 'Feb 13, 2025', project: 'E-commerce Platform Maintenance', status: 'pending', firstHalf: ['Fixed Amazon & Flipkart follow ups and pricing updates', 'Reconciled laptop inventory across all platforms', 'Updated product listings for festive offers'], secondHalf: ['Closed open service tickets for smartphone repairs', 'Coordinated with logistics team for pending deliveries', 'Prepared daily sales report and shared with management'], todoList: ['Follow up on pending customer queries', 'Update inventory spreadsheet for new arrivals', 'Schedule team meeting for next week planning'] },
-    { id: 2, employee: 'Priya Patel', avatar: 'PP', dept: 'Design', date: 'Feb 13, 2025', project: 'Mobile App UI Revamp', status: 'approved', firstHalf: ['Completed wireframes for onboarding screens', 'Reviewed design system with senior designer', 'Updated color palette based on feedback'], secondHalf: ['Implemented new login screen components', 'Fixed responsive issues on dashboard', 'Prepared handoff document for developers'], todoList: ['Start on profile settings screen', 'Review developer feedback', 'Submit weekly status report'] },
-    { id: 3, employee: 'Amit Kumar', avatar: 'AK', dept: 'Data', date: 'Feb 12, 2025', project: 'CRM Data Migration', status: 'rejected', firstHalf: ['Mapped legacy fields to new schema', 'Ran test migration on 500 records', 'Documented transformation rules'], secondHalf: ['Fixed 12 data inconsistency errors', 'Coordinated with DBA for index optimization', 'Sent migration progress report'], todoList: ['Re-run migration with fixed mappings', 'Validate migrated records with QA', 'Update runbook documentation'] },
-    { id: 4, employee: 'Sneha Reddy', avatar: 'SR', dept: 'Engineering', date: 'Feb 12, 2025', project: 'Internal HR Portal', status: 'approved', firstHalf: ['Built leave request form with validation', 'Integrated with email notification service', 'Unit tested 3 new API endpoints'], secondHalf: ['Code review for team PR submissions', 'Updated API documentation', 'Demo to HR stakeholders'], todoList: ['Address HR feedback from demo', 'Fix pagination bug on leave history', 'Sync with backend team on permissions'] },
-    { id: 5, employee: 'Vikram Singh', avatar: 'VS', dept: 'Operations', date: 'Feb 11, 2025', project: 'Warehouse Management System', status: 'pending', firstHalf: ['Audited inbound shipment records', 'Synced barcode scanner firmware', 'Generated weekly stock report'], secondHalf: ['Resolved discrepancy in rack B-12', 'Trained 2 staff on new scanning workflow', 'Updated SOP documentation'], todoList: ['Complete monthly audit checklist', 'Report damaged goods to procurement', 'Schedule maintenance for conveyor belt'] },
-    { id: 6, employee: 'Meera Joshi', avatar: 'MJ', dept: 'Marketing', date: 'Feb 11, 2025', project: 'Festive Campaign Q4', status: 'approved', firstHalf: ['Drafted email campaign copy for Diwali', 'Coordinated with design team on banners', 'Updated landing page content'], secondHalf: ['Analyzed A/B test results', 'Sent campaign brief to media partners', 'Prepared ROI report for management'], todoList: ['Launch SMS campaign', 'Monitor campaign metrics', 'Prepare post-campaign analysis'] },
-    { id: 7, employee: 'Karan Mehta', avatar: 'KM', dept: 'Engineering', date: 'Feb 10, 2025', project: 'Payment Gateway Integration', status: 'pending', firstHalf: ['Integrated Razorpay webhook handlers', 'Tested payment flow on staging', 'Fixed currency rounding bug'], secondHalf: ['Deployed to production with feature flag', 'Monitored transaction success rate', 'Updated merchant documentation'], todoList: ['Enable for all merchants', 'Set up alerting for failures', 'Write integration test suite'] },
-    { id: 8, employee: 'Divya Nair', avatar: 'DN', dept: 'QA', date: 'Feb 10, 2025', project: 'Mobile App UI Revamp', status: 'rejected', firstHalf: ['Wrote test cases for new onboarding flow', 'Ran regression on authentication module', 'Filed 5 UI bug reports'], secondHalf: ['Retested 8 resolved issues', 'Updated test plan document', 'Synced with dev team on blockers'], todoList: ['Complete smoke testing for v2.1', 'Update JIRA with test results', 'Attend sprint review meeting'] },
-];
+import { getAllWorkLogs, updateWorkLogStatus } from '../../services/worklogService';
+import { getDashboardStats } from '../../services/adminService';
 
 const LOGS_PER_PAGE = 5;
 const avatarColors = ['bg-teal-500', 'bg-blue-500', 'bg-orange-500', 'bg-purple-500', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500', 'bg-cyan-500'];
@@ -32,70 +20,177 @@ const statusCfg = {
     pending:  { label: '⏳ Pending',  pill: 'bg-yellow-100 text-yellow-700 border border-yellow-200', dot: 'bg-yellow-400' },
 };
 
+// Helper function to get initials
+const getInitials = (name) => {
+    return name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+};
+
+// Helper function to format date
+const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 export default function AdminDashboard() {
-    const [logs, setLogs] = useState(ALL_LOGS);
-    const [collapsed, setCollapsed]       = useState(false);
+    const [logs, setLogs] = useState([]);
+    const [stats, setStats] = useState(null);
+    const [collapsed, setCollapsed] = useState(false);
     const [viewLog, setViewLog] = useState(null);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [activeNav, setActiveNav] = useState('dashboard');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
 
-    // ── Derived stats ──────────────────────────────────────────────────────────
-    const total    = logs.length;
+    // Fetch dashboard data
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            // Fetch work logs
+            const logsResponse = await getAllWorkLogs({});
+            setLogs(logsResponse.data || []);
+            
+            // Fetch dashboard stats
+            const statsResponse = await getDashboardStats();
+            setStats(statsResponse.data || null);
+            
+        } catch (err) {
+            console.error('Error fetching dashboard data:', err);
+            setError(err.message || 'Failed to load dashboard data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial load
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    // Refresh data
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        await fetchDashboardData();
+        setRefreshing(false);
+    };
+
+    // Derived stats from logs
+    const total = logs.length;
     const approved = logs.filter(l => l.status === 'approved').length;
     const rejected = logs.filter(l => l.status === 'rejected').length;
-    const pending  = logs.filter(l => l.status === 'pending').length;
-    const employees = [...new Set(logs.map(l => l.employee))].length;
+    const pending = logs.filter(l => l.status === 'pending').length;
+    
+    // Get unique employees count
+    const employees = stats?.employees?.total || [...new Set(logs.map(l => l.employee?.name))].length;
 
-    // ── Filter + search ────────────────────────────────────────────────────────
+    // Filter + search
     const filtered = logs.filter(l => {
-        const matchSearch = l.employee.toLowerCase().includes(search.toLowerCase()) ||
+        const employeeName = l.employee?.name || '';
+        const employeeDept = l.employee?.department || '';
+        
+        const matchSearch = employeeName.toLowerCase().includes(search.toLowerCase()) ||
                             l.project.toLowerCase().includes(search.toLowerCase()) ||
-                            l.dept.toLowerCase().includes(search.toLowerCase());
+                            employeeDept.toLowerCase().includes(search.toLowerCase());
         const matchStatus = filterStatus === 'all' || l.status === filterStatus;
         return matchSearch && matchStatus;
     });
+    
     const totalPages = Math.ceil(filtered.length / LOGS_PER_PAGE);
-    const paginated  = filtered.slice((currentPage - 1) * LOGS_PER_PAGE, currentPage * LOGS_PER_PAGE);
+    const paginated = filtered.slice((currentPage - 1) * LOGS_PER_PAGE, currentPage * LOGS_PER_PAGE);
 
-    // ── Actions ────────────────────────────────────────────────────────────────
-    const updateStatus = (id, status) => {
-        setLogs(logs.map(l => l.id === id ? { ...l, status } : l));
-        if (viewLog?.id === id) setViewLog({ ...viewLog, status });
+    // Update status
+    const handleUpdateStatus = async (id, status) => {
+        try {
+            await updateWorkLogStatus(id, status);
+            
+            // Update local state
+            setLogs(logs.map(l => l._id === id ? { ...l, status } : l));
+            if (viewLog?._id === id) {
+                setViewLog({ ...viewLog, status });
+            }
+            
+            // Show success message (you can add toast notification here)
+            console.log(`Work log ${status} successfully`);
+            
+        } catch (err) {
+            console.error('Error updating status:', err);
+            alert(err.message || 'Failed to update work log status');
+        }
     };
 
-    const handleSearch = (val) => { setSearch(val); setCurrentPage(1); };
-    const handleFilter = (val) => { setFilterStatus(val); setCurrentPage(1); };
-
-    // ── Sidebar nav items ──────────────────────────────────────────────────────
+    const handleSearch = (val) => { 
+        setSearch(val); 
+        setCurrentPage(1); 
+    };
     
+    const handleFilter = (val) => { 
+        setFilterStatus(val); 
+        setCurrentPage(1); 
+    };
 
-    // ── Bar chart mock ─────────────────────────────────────────────────────────
+    // Department breakdown from stats or logs
+    const depts = stats?.departmentStats?.map(d => d._id) || [...new Set(logs.map(l => l.employee?.department).filter(Boolean))];
+    const deptColors = ['bg-teal-500', 'bg-blue-500', 'bg-orange-500', 'bg-purple-500', 'bg-rose-500'];
+
+    // Weekly data (mock - you can calculate from real data if needed)
     const weekData = [
-        { day: 'Mon', approved: 4, pending: 2, rejected: 1 },
-        { day: 'Tue', approved: 6, pending: 1, rejected: 0 },
-        { day: 'Wed', approved: 3, pending: 4, rejected: 2 },
-        { day: 'Thu', approved: 7, pending: 2, rejected: 1 },
-        { day: 'Fri', approved: 5, pending: 3, rejected: 0 },
-        { day: 'Sat', approved: 2, pending: 1, rejected: 0 },
-        { day: 'Sun', approved: 1, pending: 0, rejected: 0 },
+        { day: 'Mon', approved: 0, pending: 0, rejected: 0 },
+        { day: 'Tue', approved: 0, pending: 0, rejected: 0 },
+        { day: 'Wed', approved: 0, pending: 0, rejected: 0 },
+        { day: 'Thu', approved: 0, pending: 0, rejected: 0 },
+        { day: 'Fri', approved: 0, pending: 0, rejected: 0 },
+        { day: 'Sat', approved: 0, pending: 0, rejected: 0 },
+        { day: 'Sun', approved: 0, pending: 0, rejected: 0 },
     ];
     const maxBar = Math.max(...weekData.map(d => d.approved + d.pending + d.rejected));
 
-    // ── Dept breakdown ─────────────────────────────────────────────────────────
-    const depts = [...new Set(logs.map(l => l.dept))];
-    const deptColors = ['bg-teal-500', 'bg-blue-500', 'bg-orange-500', 'bg-purple-500', 'bg-rose-500'];
+    // Loading state
+    if (loading) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error && logs.length === 0) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <FiAlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+                    <p className="mt-4 text-gray-800 font-semibold">Failed to load dashboard</p>
+                    <p className="text-gray-600 text-sm mt-2">{error}</p>
+                    <button 
+                        onClick={fetchDashboardData}
+                        className="mt-4 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen bg-gray-50 font-sans overflow-hidden text-black">
-
             {/* ════ SIDEBAR ════ */}
-         <AdminSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+            <AdminSidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+            
             {/* ════ MAIN ════ */}
             <div className="flex-1 flex flex-col overflow-hidden">
-
                 {/* ── Topbar ── */}
                 <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4 flex-shrink-0 sticky top-0 z-10">
                     <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -103,37 +198,32 @@ export default function AdminDashboard() {
                     </button>
                     <div className="flex-1">
                         <h1 className="text-lg font-bold text-gray-800">Admin Dashboard</h1>
-                        <p className="text-xs text-gray-400">Thursday, Feb 13 2025</p>
+                        <p className="text-xs text-gray-400">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</p>
                     </div>
-                    {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <FiBell className="w-4 h-4 text-gray-600" />
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                    </button> */}
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold">A</div>
                 </header>
 
                 {/* ── Scrollable body ── */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
                     {/* ── STAT CARDS ── */}
                     <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
                         {[
-                            { label: 'Total Logs',  value: total,    icon: FiFileText,    color: 'from-teal-500 to-teal-600',   light: 'bg-teal-50 text-teal-600' },
-                            { label: 'Employees',   value: employees, icon: FiUsers,       color: 'from-blue-500 to-blue-600',   light: 'bg-blue-50 text-blue-600' },
-                            { label: 'Approved',    value: approved, icon: FiCheckCircle, color: 'from-green-500 to-green-600', light: 'bg-green-50 text-green-600' },
-                            { label: 'Pending',     value: pending,  icon: FiClock,       color: 'from-yellow-500 to-yellow-600', light: 'bg-yellow-50 text-yellow-600' },
-                            { label: 'Rejected',    value: rejected, icon: FiXCircle,     color: 'from-red-500 to-red-600',     light: 'bg-red-50 text-red-600' },
+                            { label: 'Total Logs', value: total, icon: FiFileText, color: 'from-teal-500 to-teal-600', light: 'bg-teal-50 text-teal-600' },
+                            { label: 'Employees', value: employees, icon: FiUsers, color: 'from-blue-500 to-blue-600', light: 'bg-blue-50 text-blue-600' },
+                            { label: 'Approved', value: approved, icon: FiCheckCircle, color: 'from-green-500 to-green-600', light: 'bg-green-50 text-green-600' },
+                            { label: 'Pending', value: pending, icon: FiClock, color: 'from-yellow-500 to-yellow-600', light: 'bg-yellow-50 text-yellow-600' },
+                            { label: 'Rejected', value: rejected, icon: FiXCircle, color: 'from-red-500 to-red-600', light: 'bg-red-50 text-red-600' },
                         ].map(({ label, value, icon: Icon, color, light }) => (
                             <div key={label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className={`text-xs font-semibold text-gray-500 uppercase tracking-wide`}>{label}</span>
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
                                     <div className={`w-8 h-8 rounded-lg ${light} flex items-center justify-center`}>
                                         <Icon className="w-4 h-4" />
                                     </div>
                                 </div>
                                 <p className="text-3xl font-bold text-gray-800">{value}</p>
                                 <div className="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className={`h-full bg-gradient-to-r ${color} rounded-full`} style={{ width: `${(value / total) * 100}%` }} />
+                                    <div className={`h-full bg-gradient-to-r ${color} rounded-full`} style={{ width: total > 0 ? `${(value / total) * 100}%` : '0%' }} />
                                 </div>
                             </div>
                         ))}
@@ -141,7 +231,6 @@ export default function AdminDashboard() {
 
                     {/* ── CHARTS ROW ── */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
                         {/* Bar Chart */}
                         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                             <div className="flex items-center justify-between mb-4">
@@ -157,7 +246,6 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex items-end gap-2 h-40">
                                 {weekData.map((d) => {
-                                    const tot = d.approved + d.pending + d.rejected;
                                     const maxH = 120;
                                     return (
                                         <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
@@ -178,9 +266,9 @@ export default function AdminDashboard() {
                             <h3 className="text-sm font-bold text-gray-800 mb-1">By Department</h3>
                             <p className="text-xs text-gray-400 mb-4">Log submissions per team</p>
                             <div className="space-y-3">
-                                {depts.map((dept, i) => {
-                                    const count = logs.filter(l => l.dept === dept).length;
-                                    const pct = Math.round((count / total) * 100);
+                                {depts.slice(0, 5).map((dept, i) => {
+                                    const count = logs.filter(l => l.employee?.department === dept).length;
+                                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                                     return (
                                         <div key={dept}>
                                             <div className="flex items-center justify-between mb-1">
@@ -188,7 +276,7 @@ export default function AdminDashboard() {
                                                 <span className="text-xs text-gray-400">{count} logs · {pct}%</span>
                                             </div>
                                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className={`h-full ${deptColors[i]} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                                                <div className={`h-full ${deptColors[i % deptColors.length]} rounded-full transition-all`} style={{ width: `${pct}%` }} />
                                             </div>
                                         </div>
                                     );
@@ -248,8 +336,13 @@ export default function AdminDashboard() {
                                             <option value="rejected">Rejected</option>
                                         </select>
                                     </div>
-                                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Refresh">
-                                        <FiRefreshCw className="w-3.5 h-3.5" />
+                                    <button 
+                                        onClick={handleRefresh}
+                                        disabled={refreshing}
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 disabled:opacity-50" 
+                                        title="Refresh"
+                                    >
+                                        <FiRefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                                     </button>
                                     <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Export">
                                         <FiDownload className="w-3.5 h-3.5" />
@@ -274,82 +367,88 @@ export default function AdminDashboard() {
                                 <tbody className="divide-y divide-gray-50">
                                     {paginated.length === 0 ? (
                                         <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No records found.</td></tr>
-                                    ) : paginated.map((log, i) => (
-                                        <tr key={log.id} className="hover:bg-gray-50/80 transition-colors group">
-                                            {/* Employee */}
-                                            <td className="px-5 py-3.5">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                                                        {log.avatar}
+                                    ) : paginated.map((log, i) => {
+                                        const employeeName = log.employee?.name || 'Unknown';
+                                        const employeeDept = log.employee?.department || 'N/A';
+                                        const initials = getInitials(employeeName);
+                                        
+                                        return (
+                                            <tr key={log._id} className="hover:bg-gray-50/80 transition-colors group">
+                                                {/* Employee */}
+                                                <td className="px-5 py-3.5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                                                            {initials}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-semibold text-gray-800">{employeeName}</p>
+                                                            <p className="text-xs text-gray-400">{employeeDept}</p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-xs font-semibold text-gray-800">{log.employee}</p>
-                                                        <p className="text-xs text-gray-400">{log.dept}</p>
+                                                </td>
+                                                {/* Project */}
+                                                <td className="px-4 py-3.5">
+                                                    <p className="text-xs text-gray-700 font-medium max-w-[180px] truncate">{log.project}</p>
+                                                </td>
+                                                {/* Date */}
+                                                <td className="px-4 py-3.5">
+                                                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                        <FiCalendar className="w-3 h-3" /> {formatDate(log.date)}
+                                                    </p>
+                                                </td>
+                                                {/* Tasks */}
+                                                <td className="px-4 py-3.5">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100">
+                                                            <FiSun className="w-3 h-3" /> {log.firstHalf?.length || 0}
+                                                        </span>
+                                                        <span className="flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">
+                                                            <FiMoon className="w-3 h-3" /> {log.secondHalf?.length || 0}
+                                                        </span>
+                                                        <span className="flex items-center gap-1 text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100">
+                                                            <FiCheckCircle className="w-3 h-3" /> {log.todoList?.length || 0}
+                                                        </span>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            {/* Project */}
-                                            <td className="px-4 py-3.5">
-                                                <p className="text-xs text-gray-700 font-medium max-w-[180px] truncate">{log.project}</p>
-                                            </td>
-                                            {/* Date */}
-                                            <td className="px-4 py-3.5">
-                                                <p className="text-xs text-gray-500 flex items-center gap-1">
-                                                    <FiCalendar className="w-3 h-3" /> {log.date}
-                                                </p>
-                                            </td>
-                                            {/* Tasks */}
-                                            <td className="px-4 py-3.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="flex items-center gap-1 text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100">
-                                                        <FiSun className="w-3 h-3" /> {log.firstHalf.length}
+                                                </td>
+                                                {/* Status */}
+                                                <td className="px-4 py-3.5">
+                                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCfg[log.status].pill}`}>
+                                                        {statusCfg[log.status].label}
                                                     </span>
-                                                    <span className="flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">
-                                                        <FiMoon className="w-3 h-3" /> {log.secondHalf.length}
-                                                    </span>
-                                                    <span className="flex items-center gap-1 text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100">
-                                                        <FiCheckCircle className="w-3 h-3" /> {log.todoList.length}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            {/* Status */}
-                                            <td className="px-4 py-3.5">
-                                                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCfg[log.status].pill}`}>
-                                                    {statusCfg[log.status].label}
-                                                </span>
-                                            </td>
-                                            {/* Actions */}
-                                            <td className="px-4 py-3.5">
-                                                <div className="flex items-center gap-1.5">
-                                                    <button
-                                                        onClick={() => setViewLog(log)}
-                                                        className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                                                        title="View"
-                                                    >
-                                                        <FiEye className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    {log.status !== 'approved' && (
+                                                </td>
+                                                {/* Actions */}
+                                                <td className="px-4 py-3.5">
+                                                    <div className="flex items-center gap-1.5">
                                                         <button
-                                                            onClick={() => updateStatus(log.id, 'approved')}
-                                                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                            title="Approve"
+                                                            onClick={() => setViewLog(log)}
+                                                            className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                                            title="View"
                                                         >
-                                                            <FiCheck className="w-3.5 h-3.5" />
+                                                            <FiEye className="w-3.5 h-3.5" />
                                                         </button>
-                                                    )}
-                                                    {log.status !== 'rejected' && (
-                                                        <button
-                                                            onClick={() => updateStatus(log.id, 'rejected')}
-                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Reject"
-                                                        >
-                                                            <FiX className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                        {log.status !== 'approved' && (
+                                                            <button
+                                                                onClick={() => handleUpdateStatus(log._id, 'approved')}
+                                                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                title="Approve"
+                                                            >
+                                                                <FiCheck className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {log.status !== 'rejected' && (
+                                                            <button
+                                                                onClick={() => handleUpdateStatus(log._id, 'rejected')}
+                                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                title="Reject"
+                                                            >
+                                                                <FiX className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -396,42 +495,50 @@ export default function AdminDashboard() {
                         <h3 className="text-sm font-bold text-gray-800 mb-1">Recent Activity</h3>
                         <p className="text-xs text-gray-400 mb-4">Latest log submissions across all employees</p>
                         <div className="space-y-3">
-                            {logs.slice(0, 5).map((log, i) => (
-                                <div key={log.id} className="flex items-center gap-3">
-                                    <div className={`w-7 h-7 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                                        {log.avatar}
+                            {logs.slice(0, 5).map((log, i) => {
+                                const employeeName = log.employee?.name || 'Unknown';
+                                const employeeDept = log.employee?.department || 'N/A';
+                                const initials = getInitials(employeeName);
+                                
+                                return (
+                                    <div key={log._id} className="flex items-center gap-3">
+                                        <div className={`w-7 h-7 rounded-full ${avatarColors[i % avatarColors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                                            {initials}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-semibold text-gray-800">
+                                                {employeeName} <span className="font-normal text-gray-500">submitted a log for</span> {log.project}
+                                            </p>
+                                            <p className="text-xs text-gray-400">{formatDate(log.date)} · {employeeDept}</p>
+                                        </div>
+                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${statusCfg[log.status].pill}`}>
+                                            {statusCfg[log.status].label}
+                                        </span>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold text-gray-800">{log.employee} <span className="font-normal text-gray-500">submitted a log for</span> {log.project}</p>
-                                        <p className="text-xs text-gray-400">{log.date} · {log.dept}</p>
-                                    </div>
-                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${statusCfg[log.status].pill}`}>
-                                        {statusCfg[log.status].label}
-                                    </span>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
-
-                </div>{/* end scrollable */}
-            </div>{/* end main */}
+                </div>
+            </div>
 
             {/* ════ VIEW MODAL ════ */}
             {viewLog && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
-
                         {/* Header */}
                         <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-5 rounded-t-2xl flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
-                                <div className={`w-10 h-10 rounded-xl ${avatarColors[logs.findIndex(l => l.id === viewLog.id) % avatarColors.length]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                                    {viewLog.avatar}
+                                <div className={`w-10 h-10 rounded-xl ${avatarColors[0]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                                    {getInitials(viewLog.employee?.name || 'Unknown')}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-bold text-white">{viewLog.employee}</h3>
-                                    <p className="text-teal-100 text-xs mt-0.5">{viewLog.dept} · {viewLog.project}</p>
+                                    <h3 className="text-lg font-bold text-white">{viewLog.employee?.name || 'Unknown'}</h3>
+                                    <p className="text-teal-100 text-xs mt-0.5">{viewLog.employee?.department || 'N/A'} · {viewLog.project}</p>
                                     <div className="flex items-center gap-2 mt-2">
-                                        <p className="text-teal-100 text-xs flex items-center gap-1"><FiCalendar className="w-3 h-3" /> {viewLog.date}</p>
+                                        <p className="text-teal-100 text-xs flex items-center gap-1">
+                                            <FiCalendar className="w-3 h-3" /> {formatDate(viewLog.date)}
+                                        </p>
                                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusCfg[viewLog.status].pill}`}>
                                             {statusCfg[viewLog.status].label}
                                         </span>
@@ -446,9 +553,9 @@ export default function AdminDashboard() {
                         {/* Stats */}
                         <div className="grid grid-cols-3 gap-3 p-5 pb-0">
                             {[
-                                { label: 'First Half', count: viewLog.firstHalf.length, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
-                                { label: 'Second Half', count: viewLog.secondHalf.length, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-                                { label: 'To-Do Tasks', count: viewLog.todoList.length, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
+                                { label: 'First Half', count: viewLog.firstHalf?.length || 0, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+                                { label: 'Second Half', count: viewLog.secondHalf?.length || 0, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+                                { label: 'To-Do Tasks', count: viewLog.todoList?.length || 0, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
                             ].map(s => (
                                 <div key={s.label} className={`${s.bg} border ${s.border} rounded-lg p-3 text-center`}>
                                     <p className={`text-2xl font-bold ${s.color}`}>{s.count}</p>
@@ -460,9 +567,9 @@ export default function AdminDashboard() {
                         {/* Body */}
                         <div className="p-5 space-y-4 max-h-[50vh] overflow-y-auto">
                             {[
-                                { title: 'First Half', items: viewLog.firstHalf, Icon: FiSun, sectionBg: 'from-orange-50 to-yellow-50', border: 'border-orange-200', iconColor: 'text-orange-600', badgeBg: 'bg-orange-100', badgeText: 'text-orange-600' },
-                                { title: 'Second Half', items: viewLog.secondHalf, Icon: FiMoon, sectionBg: 'from-blue-50 to-indigo-50', border: 'border-blue-200', iconColor: 'text-blue-600', badgeBg: 'bg-blue-100', badgeText: 'text-blue-600' },
-                                { title: 'To-Do List (Next Day)', items: viewLog.todoList, Icon: FiCheckCircle, sectionBg: 'from-green-50 to-emerald-50', border: 'border-green-200', iconColor: 'text-green-600', badgeBg: 'bg-green-100', badgeText: 'text-green-600' },
+                                { title: 'First Half', items: viewLog.firstHalf || [], Icon: FiSun, sectionBg: 'from-orange-50 to-yellow-50', border: 'border-orange-200', iconColor: 'text-orange-600', badgeBg: 'bg-orange-100', badgeText: 'text-orange-600' },
+                                { title: 'Second Half', items: viewLog.secondHalf || [], Icon: FiMoon, sectionBg: 'from-blue-50 to-indigo-50', border: 'border-blue-200', iconColor: 'text-blue-600', badgeBg: 'bg-blue-100', badgeText: 'text-blue-600' },
+                                { title: 'To-Do List (Next Day)', items: viewLog.todoList || [], Icon: FiCheckCircle, sectionBg: 'from-green-50 to-emerald-50', border: 'border-green-200', iconColor: 'text-green-600', badgeBg: 'bg-green-100', badgeText: 'text-green-600' },
                             ].map(({ title, items, Icon, sectionBg, border, iconColor, badgeBg, badgeText }) => (
                                 <div key={title} className={`bg-gradient-to-r ${sectionBg} rounded-xl p-4 border ${border}`}>
                                     <div className="flex items-center gap-2 mb-3">
@@ -487,12 +594,24 @@ export default function AdminDashboard() {
                                 Close
                             </button>
                             {viewLog.status !== 'approved' && (
-                                <button onClick={() => updateStatus(viewLog.id, 'approved')} className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all text-sm flex items-center justify-center gap-2 shadow-md">
+                                <button 
+                                    onClick={() => {
+                                        handleUpdateStatus(viewLog._id, 'approved');
+                                        setViewLog(null);
+                                    }} 
+                                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all text-sm flex items-center justify-center gap-2 shadow-md"
+                                >
                                     <FiCheck className="w-4 h-4" /> Approve
                                 </button>
                             )}
                             {viewLog.status !== 'rejected' && (
-                                <button onClick={() => updateStatus(viewLog.id, 'rejected')} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all text-sm flex items-center justify-center gap-2 shadow-md">
+                                <button 
+                                    onClick={() => {
+                                        handleUpdateStatus(viewLog._id, 'rejected');
+                                        setViewLog(null);
+                                    }} 
+                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all text-sm flex items-center justify-center gap-2 shadow-md"
+                                >
                                     <FiX className="w-4 h-4" /> Reject
                                 </button>
                             )}

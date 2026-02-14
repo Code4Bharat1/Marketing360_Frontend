@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Home as HomeIcon,
   Calendar,
@@ -15,7 +16,9 @@ import {
   Plus,
   Bell,
   ChevronRight,
-  Menu
+  Menu,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import PunchModal from './PunchModal';
 import Sidebar from './sidebar';
@@ -25,10 +28,73 @@ export default function EmployeeDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [punchInTime, setPunchInTime] = useState(null);
-  const [workedHours, setWorkedHours] = useState({ hours: 5, minutes: 12 });
+  const [workedHours, setWorkedHours] = useState({ hours: 0, minutes: 0 });
   const [showPunchModal, setShowPunchModal] = useState(false);
   const [punchType, setPunchType] = useState('in');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // User state
+  const [user, setUser] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const [userError, setUserError] = useState(null);
+
+  // Tasks state
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksError, setTasksError] = useState(null);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  // Fetch current user on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        setUserLoading(true);
+        setUserError(null);
+        const token = localStorage.getItem('authToken');
+        const response = await axios.get(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.data.success) {
+          setUser(response.data.data);
+        }
+      } catch (error) {
+        const message =
+          error.response?.data?.message || 'Failed to fetch user details';
+        setUserError(message);
+        console.error('Fetch user error:', error);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  // Fetch assigned tasks on mount
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setTasksLoading(true);
+        setTasksError(null);
+        const token = localStorage.getItem('authToken');
+        const response = await axios.get(`${API_URL}/tasks/my-tasks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.data.success) {
+          setTasks(response.data.data);
+        }
+      } catch (error) {
+        const message =
+          error.response?.data?.message || 'Failed to fetch tasks';
+        setTasksError(message);
+        console.error('Fetch tasks error:', error);
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, []);
 
   // Update current time every second
   useEffect(() => {
@@ -63,37 +129,39 @@ export default function EmployeeDashboard() {
     setShowPunchModal(true);
   };
 
-  const tasks = [
-    {
-      id: 1,
-      title: 'Update stock count for Electronics section',
-      dueTime: '4:00 PM',
-      priority: 'High',
-      status: 'pending'
-    },
-    {
-      id: 2,
-      title: 'Prepare weekly sales report',
-      dueTime: '10:00 AM',
-      priority: 'Medium',
-      status: 'in-progress'
-    },
-    {
-      id: 3,
-      title: 'Verify return requests',
-      dueTime: '3:30 PM',
-      priority: 'Low',
-      status: 'pending'
-    }
-  ];
-
-  const shiftDetails = {
-    startTime: '09:00 AM',
-    endTime: '06:00 PM',
-    shiftName: 'Morning A',
-    location: 'Main Store',
-    manager: 'Suffyan Sir'
+  // Greeting based on time
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   };
+
+  // Get initials from name
+  const getInitials = (name = '') => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Pending tasks count
+  const pendingCount = tasks.filter(
+    (t) => t.status === 'Pending' || t.status === 'in-progress'
+  ).length;
+
+const shiftDetails = {
+  startTime: user?.assignedStartTime,
+  endTime: user?.assignedEndTime,
+  shiftName: user?.shiftName,
+  location: user?.Location,
+  manager: user?.managerName,
+};
+
+
+  // console.log(user)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex">
@@ -130,17 +198,19 @@ export default function EmployeeDashboard() {
           <div className="flex items-center gap-2 sm:gap-4">
             {/* User Profile - Desktop only */}
             <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200">
-              <User className="w-4 h-4 text-slate-600" />
-              <div>
-                <p className="text-sm font-semibold text-slate-800">Vikram Singh</p>
-              </div>
+              {userLoading ? (
+                <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+              ) : (
+                <>
+                  <User className="w-4 h-4 text-slate-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {user?.name || 'Employee'}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
-
-            {/* Notification Bell */}
-            {/* <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors relative">
-              <Bell className="w-5 h-5 text-slate-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button> */}
           </div>
         </header>
 
@@ -149,13 +219,30 @@ export default function EmployeeDashboard() {
           <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
             {/* Greeting */}
             <div className="mb-6 sm:mb-8">
-              <h3 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
-                Good Morning, Vikram!
-              </h3>
-              <p className="text-sm sm:text-base text-slate-600">
-                Here's what's happening with your shift today.
-              </p>
+              {userLoading ? (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                  <span className="text-slate-500">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+                    {getGreeting()}, {user?.name?.split(' ')[0] || 'Employee'}!
+                  </h3>
+                  <p className="text-sm sm:text-base text-slate-600">
+                    Here's what's happening with your shift today.
+                  </p>
+                </>
+              )}
             </div>
+
+            {/* User Error Banner */}
+            {userError && (
+              <div className="mb-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{userError}</span>
+              </div>
+            )}
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -169,22 +256,29 @@ export default function EmployeeDashboard() {
                 </div>
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-2 h-2 rounded-full ${isCheckedIn ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                    <div
+                      className={`w-2 h-2 rounded-full ${isCheckedIn ? 'bg-green-500' : 'bg-slate-300'
+                        }`}
+                    ></div>
                     <p className="text-base sm:text-lg font-bold text-slate-800">
                       {isCheckedIn ? 'Checked In' : 'Not Checked In'}
                     </p>
                   </div>
                   {isCheckedIn && punchInTime && (
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Since {punchInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      Since{' '}
+                      {punchInTime.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
                   )}
                 </div>
                 <button
                   onClick={() => openPunchModal(isCheckedIn ? 'out' : 'in')}
                   className={`w-full py-2.5 sm:py-3 px-4 rounded-lg font-semibold transition-all text-sm sm:text-base ${isCheckedIn
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     }`}
                 >
                   {isCheckedIn ? 'Check Out' : 'Check In'}
@@ -218,7 +312,13 @@ export default function EmployeeDashboard() {
                   <ListTodo className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 </div>
                 <div className="mb-2">
-                  <p className="text-3xl sm:text-4xl font-bold text-slate-800">3</p>
+                  {tasksLoading ? (
+                    <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+                  ) : (
+                    <p className="text-3xl sm:text-4xl font-bold text-slate-800">
+                      {pendingCount}
+                    </p>
+                  )}
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500">Pending Tasks</p>
               </div>
@@ -229,7 +329,9 @@ export default function EmployeeDashboard() {
               {/* Shift Details Card */}
               <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <h4 className="text-base sm:text-lg font-bold text-slate-800">Shift Details</h4>
+                  <h4 className="text-base sm:text-lg font-bold text-slate-800">
+                    Shift Details
+                  </h4>
                   <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 </div>
 
@@ -238,7 +340,9 @@ export default function EmployeeDashboard() {
                     <p className="text-2xl sm:text-3xl font-bold text-slate-800 mb-1">
                       {shiftDetails.startTime}
                     </p>
-                    <p className="text-xs sm:text-sm text-slate-500">to {shiftDetails.endTime}</p>
+                    <p className="text-xs sm:text-sm text-slate-500">
+                      to {shiftDetails.endTime}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -281,13 +385,10 @@ export default function EmployeeDashboard() {
 
               {/* Assigned Tasks Card */}
               <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
-                
-
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <h4 className="text-base sm:text-lg font-bold text-slate-800">
                     Assigned Tasks
                   </h4>
-
                   <Link
                     href="/employee/tasks"
                     className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
@@ -296,37 +397,79 @@ export default function EmployeeDashboard() {
                   </Link>
                 </div>
 
-                <div className="space-y-3">
-                  {tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-xs sm:text-sm font-semibold text-slate-800 flex-1 group-hover:text-blue-600 transition-colors">
-                          {task.title}
-                        </p>
-                        <span
-                          className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${task.priority === 'High'
+                {/* Tasks Loading State */}
+                {tasksLoading && (
+                  <div className="flex flex-col items-center justify-center py-10 gap-3">
+                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    <p className="text-sm text-slate-500">Loading tasks...</p>
+                  </div>
+                )}
+
+                {/* Tasks Error State */}
+                {!tasksLoading && tasksError && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{tasksError}</span>
+                  </div>
+                )}
+
+                {/* Tasks Empty State */}
+                {!tasksLoading && !tasksError && tasks.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
+                    <ListTodo className="w-10 h-10" />
+                    <p className="text-sm font-medium">No tasks assigned</p>
+                  </div>
+                )}
+
+                {/* Tasks List */}
+                {!tasksLoading && !tasksError && tasks.length > 0 && (
+                  <div className="space-y-3">
+                    {tasks.slice(0, 3).map((task) => (
+                      <div
+                        key={task._id}
+                        className="p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="text-xs sm:text-sm font-semibold text-slate-800 flex-1 group-hover:text-blue-600 transition-colors">
+                            {task.title}
+                          </p>
+                          <span
+                            className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${task.priority === 'high'
                               ? 'bg-red-100 text-red-700'
-                              : task.priority === 'Medium'
+                              : task.priority === 'medium'
                                 ? 'bg-yellow-100 text-yellow-700'
                                 : 'bg-green-100 text-green-700'
-                            }`}
-                        >
-                          {task.priority}
-                        </span>
+                              }`}
+                          >
+                            {task.priority?.charAt(0).toUpperCase() +
+                              task.priority?.slice(1)}
+                          </span>
+                        </div>
+                        {task.dueDate && (
+                          <p className="text-xs text-slate-500">
+                            Due:{' '}
+                            {new Date(task.dueDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        )}
+                        {task.assignedBy?.name && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            Assigned by: {task.assignedBy.name}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-500">Due today at {task.dueTime}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </main>
-
 
       {/* Punch In/Out Modal */}
       {showPunchModal && (
@@ -358,11 +501,6 @@ export default function EmployeeDashboard() {
           </button>
         </div>
       </nav>
-
-      {/* Floating Action Button */}
-      {/* <button className="fixed bottom-20 sm:bottom-8 right-6 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full shadow-lg shadow-blue-300 flex items-center justify-center text-white hover:scale-110 transition-transform z-20">
-        <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
-      </button> */}
     </div>
   );
 }

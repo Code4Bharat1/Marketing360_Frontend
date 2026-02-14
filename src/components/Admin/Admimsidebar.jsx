@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     FiBarChart2, FiFileText, FiUsers, FiActivity,
     FiSettings, FiLogOut, FiCheckSquare
@@ -10,27 +10,58 @@ import {
 import { BiPackage } from 'react-icons/bi';
 
 const navItems = [
-    { key: 'dashboard',    label: 'Dashboard',   icon: FiBarChart2,   href: '/admin/dashboard',   badge: null },
-    { key: 'work',         label: 'Work Logs',   icon: FiFileText,    href: '/admin/work',         badge: 3    },
-    { key: 'assign-tasks', label: 'Assign Tasks',icon: FiCheckSquare, href: '/admin/assign-tasks', badge: null },
-    { key: 'employees',    label: 'Employees',   icon: FiUsers,       href: '/admin/employees',    badge: null },
+    { key: 'dashboard', label: 'Dashboard', icon: FiBarChart2, href: '/admin/dashboard', badge: null },
+    { key: 'work', label: 'Work Logs', icon: FiFileText, href: '/admin/work', badge: null },
+    { key: 'assign-tasks', label: 'Assign Tasks', icon: FiCheckSquare, href: '/admin/assign-tasks', badge: null },
+    { key: 'employees', label: 'Employees', icon: FiUsers, href: '/admin/employees', badge: null },
     // { key: 'reports',   label: 'Reports',     icon: FiActivity,    href: '/admin/reports',      badge: null },
     // { key: 'settings',  label: 'Settings',    icon: FiSettings,    href: '/admin/settings',     badge: null },
 ];
 
 export default function AdminSidebar({ collapsed = false, onToggle }) {
-    const pathname = usePathname();   // ← current URL auto detect
-    const router   = useRouter();
+    const pathname = usePathname();
+    const router = useRouter();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [userData, setUserData] = useState({ name: 'A', email: 'admin@example.com' });
+
+    // ✅ Access localStorage only on client side
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const username = localStorage.getItem("user");
+                if (username) {
+                    const user = JSON.parse(username);
+                    setUserData({
+                        name: user.name || 'Admin',
+                        email: user.email || 'admin@example.com'
+                    });
+                }
+            } catch (error) {
+                console.error('Error parsing user data:', error);
+                // Keep default values if parsing fails
+            }
+        }
+    }, []);
 
     // ✅ Active check: exact match OR nested route
-    // e.g. /admin/work  or  /admin/work/123  both highlight "Work Logs"
     const isActive = (href) =>
         pathname === href || pathname.startsWith(href + '/');
 
     const handleLogout = () => {
         setShowLogoutModal(false);
-        router.push('/');           // ← apna actual logout route yahan daalo
+        
+        // Clear localStorage
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+        }
+        
+        router.push('/');
+    };
+
+    // Get initials from name
+    const getInitials = (name) => {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     };
 
     return (
@@ -59,7 +90,7 @@ export default function AdminSidebar({ collapsed = false, onToggle }) {
                 {/* ── Nav ── */}
                 <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto overflow-x-hidden">
                     {navItems.map(({ key, label, icon: Icon, href, badge }) => {
-                        const active = isActive(href); // ✅ URL se auto detect
+                        const active = isActive(href);
 
                         return (
                             <Link
@@ -111,11 +142,11 @@ export default function AdminSidebar({ collapsed = false, onToggle }) {
                             className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group"
                         >
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                A
+                                {getInitials(userData.name)}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-gray-800 truncate">Admin User</p>
-                                <p className="text-xs text-gray-400 truncate">admin@worktrack.in</p>
+                                <p className="text-xs font-semibold text-gray-800 truncate">{userData.name}</p>
+                                <p className="text-xs text-gray-400 truncate">{userData.email}</p>
                             </div>
                             <FiLogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors flex-shrink-0" />
                         </div>
@@ -123,9 +154,10 @@ export default function AdminSidebar({ collapsed = false, onToggle }) {
                         <div
                             onClick={() => setShowLogoutModal(true)}
                             className="flex justify-center cursor-pointer"
+                            title={userData.name}
                         >
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold">
-                                A
+                                {getInitials(userData.name)}
                             </div>
                         </div>
                     )}

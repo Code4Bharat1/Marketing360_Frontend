@@ -1,4 +1,4 @@
-import DailyWorkLogs from '@/components/Employee/task'
+import DailyWorkLogs from '@/components/Employee/wroklogpage'
 import React from 'react'
 
 const page = () => {

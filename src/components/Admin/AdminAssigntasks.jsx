@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     FiPlus, FiX, FiCheck, FiEdit2, FiTrash2, FiEye,
     FiCalendar, FiFlag, FiUser, FiSearch, FiFilter,
@@ -10,19 +10,22 @@ import {
     FiArrowUp, FiArrowRight, FiArrowDown, FiRefreshCw
 } from 'react-icons/fi';
 import AdminSidebar from './Admimsidebar';
+import { 
+    getAllTasks, 
+    createTask, 
+    updateTask, 
+    deleteTask as deleteTaskAPI,
+    updateTaskStatus as updateTaskStatusAPI 
+} from '../../services/taskService';
+import { getAllEmployees } from '../../services/adminService';
+import { toast } from 'react-toastify';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TASKS_PER_PAGE = 8;
 
-const EMPLOYEES = [
-    { id: 1,  name: 'Rahul Sharma',  avatar: 'RS', dept: 'Engineering', color: 'bg-teal-500'    },
-    { id: 2,  name: 'Priya Patel',   avatar: 'PP', dept: 'Design',      color: 'bg-blue-500'    },
-    { id: 3,  name: 'Amit Kumar',    avatar: 'AK', dept: 'Data',        color: 'bg-orange-500'  },
-    { id: 4,  name: 'Sneha Reddy',   avatar: 'SR', dept: 'Engineering', color: 'bg-purple-500'  },
-    { id: 5,  name: 'Vikram Singh',  avatar: 'VS', dept: 'Operations',  color: 'bg-rose-500'    },
-    { id: 6,  name: 'Meera Joshi',   avatar: 'MJ', dept: 'Marketing',   color: 'bg-emerald-500' },
-    { id: 7,  name: 'Karan Mehta',   avatar: 'KM', dept: 'Engineering', color: 'bg-amber-500'   },
-    { id: 8,  name: 'Divya Nair',    avatar: 'DN', dept: 'QA',          color: 'bg-cyan-500'    },
+const avatarColors = [
+    'bg-teal-500', 'bg-blue-500', 'bg-orange-500', 'bg-purple-500',
+    'bg-rose-500', 'bg-emerald-500', 'bg-amber-500', 'bg-cyan-500'
 ];
 
 const PRIORITY_CFG = {
@@ -40,21 +43,6 @@ const STATUS_CFG = {
 
 const CATEGORIES = ['Development', 'Design', 'Marketing', 'Operations', 'QA', 'Data', 'HR', 'Finance'];
 
-const INITIAL_TASKS = [
-    { id: 1,  title: 'Fix payment gateway timeout on checkout',    desc: 'Investigate and resolve recurring timeout issues during high-traffic checkout events. Coordinate with Razorpay support.', assignedTo: [1, 4], priority: 'high',   status: 'in_progress', category: 'Development', dueDate: '2025-02-16', createdAt: 'Feb 11, 2025' },
-    { id: 2,  title: 'Design new onboarding screens for mobile app', desc: 'Create wireframes and high-fidelity mockups for the new user onboarding flow. Follow the updated design system.', assignedTo: [2],    priority: 'medium', status: 'review',      category: 'Design',       dueDate: '2025-02-20', createdAt: 'Feb 10, 2025' },
-    { id: 3,  title: 'Migrate CRM data to new schema',              desc: 'Run the data migration script on production after successful staging validation. Ensure rollback plan is ready.', assignedTo: [3],    priority: 'high',   status: 'todo',        category: 'Data',         dueDate: '2025-02-14', createdAt: 'Feb 09, 2025' },
-    { id: 4,  title: 'Q4 Festive campaign email blast',             desc: 'Prepare, schedule and send the Diwali email campaign to the segmented customer list. Track open rates.', assignedTo: [6],    priority: 'medium', status: 'done',        category: 'Marketing',    dueDate: '2025-02-13', createdAt: 'Feb 08, 2025' },
-    { id: 5,  title: 'Conduct warehouse Zone B cycle count',        desc: 'Complete physical inventory count for Zone B and reconcile with the WMS records. File discrepancy report.', assignedTo: [5],    priority: 'low',    status: 'in_progress', category: 'Operations',   dueDate: '2025-02-18', createdAt: 'Feb 10, 2025' },
-    { id: 6,  title: 'Write integration test suite for auth API',   desc: 'Cover all authentication endpoints with integration tests. Minimum 80% coverage required before merge.', assignedTo: [7, 4], priority: 'medium', status: 'todo',        category: 'Development', dueDate: '2025-02-22', createdAt: 'Feb 11, 2025' },
-    { id: 7,  title: 'Mobile app v2.1 smoke testing',               desc: 'Execute the smoke test checklist on the v2.1 release candidate across iOS and Android devices.', assignedTo: [8],    priority: 'high',   status: 'review',      category: 'QA',           dueDate: '2025-02-15', createdAt: 'Feb 12, 2025' },
-    { id: 8,  title: 'Update brand identity color tokens',          desc: 'Finalize new brand color palette and update all design tokens in Figma and Storybook.', assignedTo: [2],    priority: 'low',    status: 'todo',        category: 'Design',       dueDate: '2025-02-25', createdAt: 'Feb 12, 2025' },
-    { id: 9,  title: 'Set up monitoring dashboard for microservices', desc: 'Configure Grafana dashboards for the new auth and user microservices. Set alerting thresholds.', assignedTo: [1],    priority: 'medium', status: 'in_progress', category: 'Development', dueDate: '2025-02-19', createdAt: 'Feb 09, 2025' },
-    { id: 10, title: 'SEO audit for top 50 landing pages',          desc: 'Audit on-page SEO factors, fix missing meta tags, and submit updated sitemap to Search Console.', assignedTo: [6],    priority: 'low',    status: 'done',        category: 'Marketing',    dueDate: '2025-02-12', createdAt: 'Feb 07, 2025' },
-    { id: 11, title: 'Resolve rack B-12 inventory discrepancy',     desc: 'Investigate and correct the stock discrepancy identified during Zone A cycle count in rack B-12.', assignedTo: [5],    priority: 'high',   status: 'done',        category: 'Operations',   dueDate: '2025-02-11', createdAt: 'Feb 08, 2025' },
-    { id: 12, title: 'HR portal leave request form QA',             desc: 'Test the new leave request form end-to-end including email notifications and manager approval workflow.', assignedTo: [8, 4], priority: 'medium', status: 'review',      category: 'QA',           dueDate: '2025-02-17', createdAt: 'Feb 11, 2025' },
-];
-
 const EMPTY_FORM = {
     title: '', desc: '', assignedTo: [], priority: 'medium',
     status: 'todo', category: 'Development',
@@ -62,7 +50,30 @@ const EMPTY_FORM = {
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function getEmployee(id) { return EMPLOYEES.find(e => e.id === id); }
+const getInitials = (name) => {
+    if (!name) return 'UK';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+};
+
+const mapBackendStatus = (backendStatus) => {
+    const statusMap = {
+        'Pending': 'todo',
+        'In Progress': 'in_progress',
+        'On Hold': 'review',
+        'Completed': 'done'
+    };
+    return statusMap[backendStatus] || 'todo';
+};
+
+const mapFrontendStatus = (frontendStatus) => {
+    const statusMap = {
+        'todo': 'Pending',
+        'in_progress': 'In Progress',
+        'review': 'On Hold',
+        'done': 'Completed'
+    };
+    return statusMap[frontendStatus] || 'Pending';
+};
 
 function isOverdue(dueDate, status) {
     if (status === 'done') return false;
@@ -70,14 +81,18 @@ function isOverdue(dueDate, status) {
 }
 
 function formatDate(d) {
+    if (!d) return 'N/A';
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // ── Avatar Stack ───────────────────────────────────────────────────────────────
-function AvatarStack({ ids, max = 3, size = 'md' }) {
+function AvatarStack({ ids, employees, max = 3, size = 'md' }) {
     const sz = size === 'sm' ? 'w-6 h-6 text-xs' : 'w-7 h-7 text-xs';
     const shown = ids.slice(0, max);
     const extra = ids.length - max;
+    
+    const getEmployee = (id) => employees.find(e => e.id === id);
+    
     return (
         <div className="flex items-center -space-x-2">
             {shown.map(id => {
@@ -100,7 +115,10 @@ function AvatarStack({ ids, max = 3, size = 'md' }) {
 }
 
 export default function AssignTasks() {
-    const [tasks, setTasks] = useState(INITIAL_TASKS);
+    const [tasks, setTasks] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [activeNav, setActiveNav] = useState('assign-tasks');
 
@@ -122,6 +140,68 @@ export default function AssignTasks() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [formError, setFormError] = useState('');
 
+    // ── Fetch data on mount ────────────────────────────────────────────────────
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            
+            const [tasksRes, employeesRes] = await Promise.all([
+                getAllTasks(),
+                getAllEmployees()
+            ]);
+            
+            // Transform tasks
+            const transformedTasks = tasksRes.data?.map(task => ({
+                id: task._id,
+                title: task.title,
+                desc: task.description || '',
+                assignedTo: Array.isArray(task.assignedTo) 
+                    ? task.assignedTo.map(emp => emp._id || emp) 
+                    : [task.assignedTo?._id || task.assignedTo],
+                priority: task.priority?.toLowerCase() || 'medium',
+                status: mapBackendStatus(task.status),
+                category: task.category || 'Development',
+                dueDate: task.dueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+                createdAt: formatDate(task.createdAt),
+                rawData: task
+            })) || [];
+            
+            setTasks(transformedTasks);
+            
+            // Transform employees
+            const transformedEmployees = employeesRes.data?.map((emp, index) => ({
+                id: emp._id,
+                name: emp.name,
+                avatar: getInitials(emp.name),
+                dept: emp.department || 'General',
+                email: emp.email,
+                color: avatarColors[index % avatarColors.length]
+            })) || [];
+            
+            setEmployees(transformedEmployees);
+            
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            toast.error(error.message || 'Failed to load data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        await fetchData();
+        setRefreshing(false);
+        toast.success('Data refreshed');
+    };
+
+    // ── Helper to get employee ─────────────────────────────────────────────────
+    const getEmployee = (id) => employees.find(e => e.id === id);
+
     // ── Stats ──────────────────────────────────────────────────────────────────
     const total       = tasks.length;
     const byStatus    = s => tasks.filter(t => t.status === s).length;
@@ -133,7 +213,7 @@ export default function AssignTasks() {
         const matchQ    = !q || t.title.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
         const matchS    = filterStatus   === 'all' || t.status   === filterStatus;
         const matchP    = filterPriority === 'all' || t.priority === filterPriority;
-        const matchA    = filterAssignee === 'all' || t.assignedTo.includes(Number(filterAssignee));
+        const matchA    = filterAssignee === 'all' || t.assignedTo.includes(filterAssignee);
         return matchQ && matchS && matchP && matchA;
     }), [tasks, search, filterStatus, filterPriority, filterAssignee]);
 
@@ -145,44 +225,128 @@ export default function AssignTasks() {
     // ── Form handlers ──────────────────────────────────────────────────────────
     const openCreate = () => { setForm(EMPTY_FORM); setEditTask(null); setFormError(''); setShowForm(true); };
     const openEdit   = (t) => {
-        setForm({ title: t.title, desc: t.desc, assignedTo: t.assignedTo, priority: t.priority, status: t.status, category: t.category, dueDate: t.dueDate });
-        setEditTask(t); setFormError(''); setShowForm(true); setViewTask(null);
+        setForm({ 
+            title: t.title, 
+            desc: t.desc, 
+            assignedTo: t.assignedTo, 
+            priority: t.priority, 
+            status: t.status, 
+            category: t.category, 
+            dueDate: t.dueDate ,
+            estimatedTime:t.estimatedTime
+        });
+        setEditTask(t); 
+        setFormError(''); 
+        setShowForm(true); 
+        setViewTask(null);
     };
     const closeForm  = () => { setShowForm(false); setEditTask(null); setForm(EMPTY_FORM); setFormError(''); };
 
     const toggleAssignee = (id) => {
         setForm(f => ({
             ...f,
-            assignedTo: f.assignedTo.includes(id) ? f.assignedTo.filter(i => i !== id) : [...f.assignedTo, id]
+            assignedTo: f.assignedTo.includes(id) 
+                ? f.assignedTo.filter(i => i !== id) 
+                : [...f.assignedTo, id]
         }));
     };
 
-    const submitForm = (e) => {
+    const submitForm = async (e) => {
         e.preventDefault();
-        if (!form.title.trim())            return setFormError('Task title is required.');
-        if (form.assignedTo.length === 0)  return setFormError('Assign to at least one employee.');
-        if (!form.dueDate)                 return setFormError('Due date is required.');
+        
+        if (!form.title.trim()) return setFormError('Task title is required.');
+        if (form.assignedTo.length === 0) return setFormError('Assign to at least one employee.');
+        if (!form.dueDate) return setFormError('Due date is required.');
+        
         setFormError('');
+        
+        const taskData = {
+            title: form.title,
+            description: form.desc,
+            assignedTo: form.assignedTo,
+            priority: form.priority.charAt(0).toUpperCase() + form.priority.slice(1),
+            status: mapFrontendStatus(form.status),
+            category: form.category,
+            dueDate: form.dueDate,
+            estimatedTime:form.estimatedTime,
+        };
 
-        if (editTask) {
-            setTasks(prev => prev.map(t => t.id === editTask.id ? { ...t, ...form } : t));
-        } else {
-            setTasks(prev => [{
-                id: Date.now(), ...form,
-                createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            }, ...prev]);
-            resetPage();
+        try {
+            if (editTask) {
+                await updateTask(editTask.id, taskData);
+                toast.success('Task updated successfully');
+                
+                setTasks(prev => prev.map(t => 
+                    t.id === editTask.id ? { ...t, ...form } : t
+                ));
+            } else {
+                const response = await createTask(taskData);
+                toast.success('Task created successfully');
+                
+                const newTask = {
+                    id: response.data._id,
+                    ...form,
+                    createdAt: formatDate(new Date()),
+                    rawData: response.data
+                };
+                
+                setTasks(prev => [newTask, ...prev]);
+                resetPage();
+            }
+            
+            closeForm();
+        } catch (error) {
+            console.error('Error saving task:', error);
+            setFormError(error.message || 'Failed to save task');
+            toast.error(error.message || 'Failed to save task');
         }
-        closeForm();
     };
 
-    const deleteTask = (id) => { setTasks(prev => prev.filter(t => t.id !== id)); setDeleteConfirm(null); setViewTask(null); };
+    const deleteTaskHandler = async (id) => {
+        try {
+            await deleteTaskAPI(id);
+            setTasks(prev => prev.filter(t => t.id !== id));
+            setDeleteConfirm(null);
+            setViewTask(null);
+            toast.success('Task deleted successfully');
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            toast.error(error.message || 'Failed to delete task');
+        }
+    };
 
-    const quickStatus = (id, status) => setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    const quickStatus = async (id, status) => {
+        try {
+            await updateTaskStatusAPI(id, mapFrontendStatus(status));
+            setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+            toast.success('Status updated');
+        } catch (error) {
+            console.error('Error updating status:', error);
+            toast.error(error.message || 'Failed to update status');
+        }
+    };
 
-    const clearFilters = () => { setSearch(''); setFilterStatus('all'); setFilterPriority('all'); setFilterAssignee('all'); resetPage(); };
+    const clearFilters = () => { 
+        setSearch(''); 
+        setFilterStatus('all'); 
+        setFilterPriority('all'); 
+        setFilterAssignee('all'); 
+        resetPage(); 
+    };
 
     const hasFilters = search || filterStatus !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all';
+
+    // ── Loading state ──────────────────────────────────────────────────────────
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-gray-50">
+                <div className="text-center">
+                    <FiRefreshCw className="w-12 h-12 text-teal-600 animate-spin mx-auto mb-4" />
+                    <p className="text-gray-600 font-medium">Loading tasks...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden text-black">
@@ -207,10 +371,6 @@ export default function AssignTasks() {
                         <h1 className="text-lg font-bold text-gray-800">Assign Tasks</h1>
                         <p className="text-xs text-gray-400">Create, assign and track employee tasks</p>
                     </div>
-                    {/* <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <FiBell className="w-4 h-4 text-gray-600" />
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
-                    </button> */}
                     <button onClick={openCreate}
                         className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg">
                         <FiPlus className="w-4 h-4" /> New Task
@@ -228,10 +388,20 @@ export default function AssignTasks() {
                                 <h2 className="text-xl font-bold text-white">Task Management</h2>
                                 <p className="text-teal-100 text-sm mt-1">Assign, track and manage all employee tasks in one place</p>
                             </div>
-                            <button onClick={openCreate}
-                                className="hidden sm:flex items-center gap-2 bg-white text-teal-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-teal-50 transition-colors shadow-md flex-shrink-0">
-                                <FiPlus className="w-4 h-4" /> Assign Task
-                            </button>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <button 
+                                    onClick={handleRefresh} 
+                                    disabled={refreshing}
+                                    className="hidden sm:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    <FiRefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> 
+                                    Refresh
+                                </button>
+                                <button onClick={openCreate}
+                                    className="hidden sm:flex items-center gap-2 bg-white text-teal-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-teal-50 transition-colors shadow-md">
+                                    <FiPlus className="w-4 h-4" /> Assign Task
+                                </button>
+                            </div>
                         </div>
 
                         {/* Stat cards */}
@@ -301,7 +471,7 @@ export default function AssignTasks() {
                                 <select value={filterAssignee} onChange={e => { setFilterAssignee(e.target.value); resetPage(); }}
                                     className="px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none cursor-pointer flex-shrink-0">
                                     <option value="all">All Employees</option>
-                                    {EMPLOYEES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                                    {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                                 </select>
 
                                 {/* View toggle */}
@@ -355,7 +525,7 @@ export default function AssignTasks() {
                                                             <span className="inline-block mt-1 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{task.category}</span>
                                                         </td>
                                                         <td className="px-4 py-3.5">
-                                                            <AvatarStack ids={task.assignedTo} />
+                                                            <AvatarStack ids={task.assignedTo} employees={employees} />
                                                         </td>
                                                         <td className="px-4 py-3.5">
                                                             <span className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border w-fit ${P.pill}`}>
@@ -406,11 +576,8 @@ export default function AssignTasks() {
                                             const overdue = isOverdue(task.dueDate, task.status);
                                             return (
                                                 <div key={task.id} className="bg-white rounded-xl border border-gray-200 hover:shadow-lg hover:border-teal-300 transition-all overflow-hidden group">
-                                                    {/* Priority stripe */}
                                                     <div className={`h-1 w-full ${P.dot}`} />
-
                                                     <div className="p-4">
-                                                        {/* Top row */}
                                                         <div className="flex items-start justify-between gap-2 mb-3">
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-bold text-gray-800 leading-snug line-clamp-2">{task.title}</p>
@@ -422,20 +589,15 @@ export default function AssignTasks() {
                                                                 <button onClick={() => setDeleteConfirm(task)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"><FiTrash2 className="w-3.5 h-3.5" /></button>
                                                             </div>
                                                         </div>
-
                                                         <p className="text-xs text-gray-500 line-clamp-2 mb-3">{task.desc}</p>
-
-                                                        {/* Badges */}
                                                         <div className="flex items-center gap-2 flex-wrap mb-3">
                                                             <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${P.pill}`}>
                                                                 <P.icon className="w-3 h-3" />{P.label}
                                                             </span>
                                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${S.pill}`}>{S.label}</span>
                                                         </div>
-
-                                                        {/* Assignees + due */}
                                                         <div className="flex items-center justify-between">
-                                                            <AvatarStack ids={task.assignedTo} size="sm" />
+                                                            <AvatarStack ids={task.assignedTo} employees={employees} size="sm" />
                                                             <p className={`text-xs flex items-center gap-1 ${overdue ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
                                                                 {overdue && <FiAlertCircle className="w-3 h-3" />}
                                                                 <FiCalendar className="w-3 h-3" />
@@ -443,8 +605,6 @@ export default function AssignTasks() {
                                                             </p>
                                                         </div>
                                                     </div>
-
-                                                    {/* Quick status footer */}
                                                     <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto">
                                                         {Object.entries(STATUS_CFG).map(([key, cfg]) => (
                                                             <button key={key} onClick={() => quickStatus(task.id, key)}
@@ -469,7 +629,6 @@ export default function AssignTasks() {
             {showForm && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
-                        {/* Header */}
                         <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-5 rounded-t-2xl flex items-center justify-between">
                             <div>
                                 <h3 className="text-lg font-bold text-white">{editTask ? 'Edit Task' : 'Assign New Task'}</h3>
@@ -487,7 +646,6 @@ export default function AssignTasks() {
                                 </div>
                             )}
 
-                            {/* Title */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Task Title <span className="text-red-500">*</span></label>
                                 <input type="text" value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))}
@@ -495,7 +653,6 @@ export default function AssignTasks() {
                                     className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-gray-800" />
                             </div>
 
-                            {/* Description */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Description</label>
                                 <textarea value={form.desc} onChange={e => setForm(f => ({...f, desc: e.target.value}))}
@@ -504,8 +661,7 @@ export default function AssignTasks() {
                                     className="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-gray-800 resize-none" />
                             </div>
 
-                            {/* Row: Priority + Category + Due */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">Priority <span className="text-red-500">*</span></label>
                                     <div className="flex gap-2">
@@ -529,9 +685,13 @@ export default function AssignTasks() {
                                     <input type="date" value={form.dueDate} onChange={e => setForm(f => ({...f, dueDate: e.target.value}))}
                                         className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-gray-800" />
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">Estimated Time <span className="text-red-500">*</span></label>
+                                    <input type="text" value={form.estimatedTime} onChange={e => setForm(f => ({...f, estimatedTime: e.target.value}))}
+                                        className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-gray-800" />
+                                </div>
                             </div>
 
-                            {/* Status (edit only) */}
                             {editTask && (
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">Status</label>
@@ -546,14 +706,13 @@ export default function AssignTasks() {
                                 </div>
                             )}
 
-                            {/* Assign to */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 mb-2">
                                     Assign To <span className="text-red-500">*</span>
                                     {form.assignedTo.length > 0 && <span className="ml-2 text-teal-600">({form.assignedTo.length} selected)</span>}
                                 </label>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {EMPLOYEES.map(emp => {
+                                    {employees.map(emp => {
                                         const selected = form.assignedTo.includes(emp.id);
                                         return (
                                             <button key={emp.id} type="button" onClick={() => toggleAssignee(emp.id)}
@@ -570,7 +729,6 @@ export default function AssignTasks() {
                                 </div>
                             </div>
 
-                            {/* Footer */}
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={closeForm} className="flex-1 px-5 py-2.5 border-2 border-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 text-sm transition-all">
                                     Cancel
@@ -588,7 +746,6 @@ export default function AssignTasks() {
             {viewTask && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
-                        {/* Header */}
                         <div className={`bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-5 rounded-t-2xl flex items-start justify-between gap-4`}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
@@ -608,13 +765,11 @@ export default function AssignTasks() {
                         </div>
 
                         <div className="p-6 space-y-5">
-                            {/* Description */}
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Description</p>
                                 <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-3 border border-gray-100">{viewTask.desc || 'No description provided.'}</p>
                             </div>
 
-                            {/* Due + overdue */}
                             <div className="flex items-center gap-3">
                                 <div className="flex-1 bg-gray-50 rounded-lg p-3 border border-gray-100">
                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Due Date</p>
@@ -631,7 +786,6 @@ export default function AssignTasks() {
                                 </div>
                             </div>
 
-                            {/* Assigned to */}
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assigned To ({viewTask.assignedTo.length})</p>
                                 <div className="space-y-2">
@@ -651,7 +805,6 @@ export default function AssignTasks() {
                                 </div>
                             </div>
 
-                            {/* Status change */}
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Update Status</p>
                                 <div className="flex flex-wrap gap-2">
@@ -665,7 +818,6 @@ export default function AssignTasks() {
                             </div>
                         </div>
 
-                        {/* Footer */}
                         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
                             <button onClick={() => setViewTask(null)} className="flex-1 border-2 border-gray-200 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-100 text-sm transition-all">Close</button>
                             <button onClick={() => openEdit(viewTask)} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 shadow-md transition-all">
@@ -692,7 +844,7 @@ export default function AssignTasks() {
                         </p>
                         <div className="flex gap-3">
                             <button onClick={() => setDeleteConfirm(null)} className="flex-1 border-2 border-gray-200 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-50 text-sm transition-all">Cancel</button>
-                            <button onClick={() => deleteTask(deleteConfirm.id)} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-lg text-sm shadow-md transition-all">Delete</button>
+                            <button onClick={() => deleteTaskHandler(deleteConfirm.id)} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-lg text-sm shadow-md transition-all">Delete</button>
                         </div>
                     </div>
                 </div>

@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
-import { 
-  Home, 
-  Calendar, 
-  Briefcase, 
+import React, { useEffect, useState } from 'react';
+import {
+  Home,
+  Calendar,
+  Briefcase,
   BarChart3,
   X,
   User,
@@ -19,13 +19,14 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
   const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [userData, setUserData] = useState({ name: 'A', email: 'admin@example.com' });
 
   const menuItems = [
     { id: 'home', label: 'Home', icon: Home, href: '/employee/dashboard' },
     { id: 'attendance', label: 'Attendance', icon: Calendar, href: '/employee/attendance' },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, href: '/employee/tasks' },
     { id: 'workLogs', label: 'Work Logs', icon: Briefcase, href: '/employee/work-logs' },
-    { id: 'performance', label: 'Performance', icon: BarChart3, href: '/employee/performance' },
+    // { id: 'performance', label: 'Performance', icon: BarChart3, href: '/employee/performance' },
     { id: 'profile', label: 'Profile', icon: User, href: '/employee/profile' },
   ];
 
@@ -35,15 +36,15 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
-    
+
     try {
       // Simulate API call - replace with your actual logout logic
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Clear any stored tokens/data
       // localStorage.removeItem('authToken');
       // sessionStorage.clear();
-      
+
       // Show success toast
       toast.success('Logged out successfully!', {
         position: 'top-right',
@@ -75,12 +76,36 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
   const handleLogoutCancel = () => {
     setShowLogoutModal(false);
   };
-
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const username = localStorage.getItem("user");
+        if (username) {
+          const user = JSON.parse(username);
+          setUserData({
+            name: user.name || 'Admin',
+            role: user.role || 'admin@example.com'
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        // Keep default values if parsing fails
+      }
+    }
+  }, []);
+  const getInitials = (name) => {
+    if (!name) return 'AP';
+    const names = name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
   return (
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
         />
@@ -99,7 +124,7 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
             <h1 className="text-xs font-semibold text-gray-900">Marketing360</h1>
             <h2 className="text-xs font-medium text-gray-900 mt-0.5">Employee Portal</h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -116,16 +141,16 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentPage === item.id;
-              
+
               return (
                 <li key={item.id}>
-                  <Link 
+                  <Link
                     href={item.href}
                     onClick={onClose}
                     className={`
                       w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm
-                      ${isActive 
-                        ? 'bg-teal-700 text-white font-medium shadow-sm' 
+                      ${isActive
+                        ? 'bg-teal-700 text-white font-medium shadow-sm'
                         : 'text-gray-700 hover:bg-gray-100'
                       }
                     `}
@@ -142,17 +167,17 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
         {/* User Profile at Bottom */}
         <div className="p-4 border-t border-gray-200 space-y-3">
           {/* Profile Card */}
-          <Link 
+          <Link
             href="/employee/profile"
             onClick={onClose}
             className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-400 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-              VS
+            <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xl font-bold shadow-lg">
+              {getInitials(userData?.name)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Vikash Singh</p>
-              <p className="text-xs text-gray-500 truncate">Store Manager</p>
+              <p className="text-sm font-medium text-gray-800 truncate">{userData.name}</p>
+              <p className="text-xs text-gray-500 truncate">{userData.role}</p>
             </div>
           </Link>
 
@@ -171,7 +196,7 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
       {showLogoutModal && (
         <div className="fixed inset-0 z-[60] overflow-y-auto">
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm"
             onClick={handleLogoutCancel}
           />
