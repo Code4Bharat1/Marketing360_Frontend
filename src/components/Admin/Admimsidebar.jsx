@@ -8,12 +8,15 @@ import {
     FiSettings, FiLogOut, FiCheckSquare
 } from 'react-icons/fi';
 import { BiPackage } from 'react-icons/bi';
+import { IoStatsChartOutline, IoTrophyOutline } from 'react-icons/io5';
 
 const navItems = [
     { key: 'dashboard', label: 'Dashboard', icon: FiBarChart2, href: '/admin/dashboard', badge: null },
     { key: 'work', label: 'Work Logs', icon: FiFileText, href: '/admin/work', badge: null },
     { key: 'assign-tasks', label: 'Assign Tasks', icon: FiCheckSquare, href: '/admin/assign-tasks', badge: null },
     { key: 'employees', label: 'Employees', icon: FiUsers, href: '/admin/employees', badge: null },
+    { key: 'performance', label: 'Performance', icon: IoStatsChartOutline, href: '/admin/performance',badge: null  },
+//   { key: 'rankings', label: 'Rankings', icon: IoTrophyOutline, href: '/admin/rankings',badge: null  }
     // { key: 'reports',   label: 'Reports',     icon: FiActivity,    href: '/admin/reports',      badge: null },
     // { key: 'settings',  label: 'Settings',    icon: FiSettings,    href: '/admin/settings',     badge: null },
 ];
