@@ -1,21 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import {
   Home as HomeIcon,
   Calendar,
   CheckSquare,
-  TrendingUp,
   Clock,
   ListTodo,
-  LogOut,
   User,
   MapPin,
-  Briefcase,
-  Plus,
-  Bell,
-  ChevronRight,
   Menu,
   AlertCircle,
   Loader2
@@ -23,6 +18,7 @@ import {
 import PunchModal from './PunchModal';
 import Sidebar from './sidebar';
 import Link from 'next/link';
+import { punchIn, punchOut, getTodayAttendance } from '../../services/attendanceService';
 
 export default function EmployeeDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -32,6 +28,8 @@ export default function EmployeeDashboard() {
   const [showPunchModal, setShowPunchModal] = useState(false);
   const [punchType, setPunchType] = useState('in');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [todayAttendance, setTodayAttendance] = useState(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
 
   // User state
   const [user, setUser] = useState(null);
@@ -44,7 +42,59 @@ export default function EmployeeDashboard() {
   const [tasksError, setTasksError] = useState(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
-  // Fetch current user on mount
+
+  // Fetch attendance status from database
+  const fetchAttendanceStatus = useCallback(async () => {
+    try {
+      setAttendanceLoading(true);
+      console.log('🔍 Fetching attendance status from database...');
+
+      // Use getTodayAttendance from the service
+      const response = await getTodayAttendance();
+
+      console.log('✅ Attendance Response:', response);
+
+      // Check if there's attendance data for today
+      const attendanceData = response?.data || null;
+
+      // Determine if user is checked in using loginTime and logoutTime
+      const hasLoginTime = attendanceData && attendanceData.loginTime;
+      const hasLogoutTime = attendanceData && attendanceData.logoutTime;
+
+      // User is checked in if there's a loginTime but no logoutTime
+      const checkedIn = hasLoginTime && !hasLogoutTime;
+
+      // Update state based on database
+      setIsCheckedIn(checkedIn);
+      setTodayAttendance(attendanceData);
+
+      // Set punch in time if checked in
+      if (checkedIn && attendanceData.loginTime) {
+        setPunchInTime(new Date(attendanceData.loginTime));
+      } else {
+        setPunchInTime(null);
+      }
+
+      console.log('📊 State Updated:', {
+        isCheckedIn: checkedIn,
+        hasLoginTime,
+        hasLogoutTime,
+        punchInTime: checkedIn ? new Date(attendanceData.loginTime) : null,
+        hasAttendanceData: !!attendanceData
+      });
+
+    } catch (error) {
+      console.error('❌ Fetch attendance status error:', error);
+      // If error or no attendance found, reset to not checked in
+      setIsCheckedIn(false);
+      setPunchInTime(null);
+      setTodayAttendance(null);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }, []);
+
+  // Fetch current user
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -68,9 +118,14 @@ export default function EmployeeDashboard() {
     };
 
     fetchUser();
-  }, []);
+  }, [API_URL]);
 
-  // Fetch assigned tasks on mount
+  // Fetch attendance status on mount and after actions
+  useEffect(() => {
+    fetchAttendanceStatus();
+  }, [fetchAttendanceStatus]);
+
+  // Fetch assigned tasks
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -94,9 +149,9 @@ export default function EmployeeDashboard() {
     };
 
     fetchTasks();
-  }, []);
+  }, [API_URL]);
 
-  // Update current time every second
+  // Update current time and worked hours every second
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -107,24 +162,140 @@ export default function EmployeeDashboard() {
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         setWorkedHours({ hours, minutes });
+      } else {
+        setWorkedHours({ hours: 0, minutes: 0 });
       }
     }, 1000);
 
     return () => clearInterval(timer);
   }, [isCheckedIn, punchInTime]);
 
-  const handlePunchIn = (data) => {
-    setIsCheckedIn(true);
-    setPunchInTime(new Date());
-    setShowPunchModal(false);
+  const handlePunchIn = async (data) => {
+    try {
+      console.log('⏰ Punching in...');
+
+      const loadingToast = toast.loading('Punching in...', {
+        position: 'top-right',
+      });
+
+      const response = await punchIn({
+        latitude: data.latitude,
+        longitude: data.longitude,
+        address: data.address,
+        photo: data.photo,
+        notes: data.notes,
+      });
+
+      toast.dismiss(loadingToast);
+
+      if (response.success) {
+        console.log('✅ Punch in successful!');
+
+        // Close modal first
+        setShowPunchModal(false);
+
+        // Show success message
+        toast.success('Successfully punched in!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+
+        // Refetch attendance status from database
+        await fetchAttendanceStatus();
+      }
+    } catch (error) {
+      console.error('❌ Punch in error:', error);
+
+      // Check if already punched in
+      if (error.message?.includes('already punched in') || error.message?.includes('Already checked in')) {
+        toast.warning('You are already punched in!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+
+        // Refetch to sync with database
+        await fetchAttendanceStatus();
+      } else {
+        toast.error(error.message || 'Failed to punch in. Please try again.', {
+          position: 'top-right',
+          autoClose: 4000,
+        });
+      }
+    }
   };
 
-  const handlePunchOut = (data) => {
-    setIsCheckedIn(false);
-    setShowPunchModal(false);
+  const handlePunchOut = async (data) => {
+    try {
+      console.log('⏰ Punching out...');
+
+      const loadingToast = toast.loading('Punching out...', {
+        position: 'top-right',
+      });
+
+      const response = await punchOut({
+        latitude: data.latitude,
+        longitude: data.longitude,
+        address: data.address,
+        photo: data.photo,
+        notes: data.notes,
+      });
+
+      toast.dismiss(loadingToast);
+
+      if (response.success) {
+        console.log('✅ Punch out successful!');
+
+        // Calculate total worked hours from response using loginTime and logoutTime
+        if (response.data?.loginTime && response.data?.logoutTime) {
+          const loginTime = new Date(response.data.loginTime);
+          const logoutTime = new Date(response.data.logoutTime);
+          const diff = logoutTime - loginTime;
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+          toast.success(
+            `Successfully punched out! Total hours: ${hours}h ${minutes}m`,
+            {
+              position: 'top-right',
+              autoClose: 4000,
+            }
+          );
+        } else {
+          toast.success('Successfully punched out!', {
+            position: 'top-right',
+            autoClose: 3000,
+          });
+        }
+
+        // Close modal
+        setShowPunchModal(false);
+
+        // Refetch attendance status from database
+        await fetchAttendanceStatus();
+      }
+    } catch (error) {
+      console.error('❌ Punch out error:', error);
+
+      // Check if not punched in
+      if (error.message?.includes('not punched in') || error.message?.includes('No active check-in') || error.message?.includes('Please punch in first')) {
+        toast.warning('You are not punched in yet!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+
+        // Refetch to sync with database
+        await fetchAttendanceStatus();
+      } else {
+        toast.error(error.message || 'Failed to punch out. Please try again.', {
+          position: 'top-right',
+          autoClose: 4000,
+        });
+      }
+    }
   };
 
   const openPunchModal = (type) => {
+    console.log(`🔔 Opening ${type} modal. Current status:`, { isCheckedIn });
     setPunchType(type);
     setShowPunchModal(true);
   };
@@ -152,16 +323,21 @@ export default function EmployeeDashboard() {
     (t) => t.status === 'Pending' || t.status === 'in-progress'
   ).length;
 
-const shiftDetails = {
-  startTime: user?.assignedStartTime,
-  endTime: user?.assignedEndTime,
-  shiftName: user?.shiftName,
-  location: user?.Location,
-  manager: user?.managerName,
-};
-
-
-  // console.log(user)
+  const shiftDetails = {
+    startTime: user?.assignedStartTime || 'N/A',
+    endTime: user?.assignedEndTime || 'N/A',
+    shiftName: user?.shiftName || 'N/A',
+    location: user?.Location || 'N/A',
+    manager: user?.managerName || 'N/A',
+  };
+  const formatTo12Hour = (time) => {
+    if (!time) return "";
+    const [hour, minute] = time.split(":");
+    const h = parseInt(hour);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const formattedHour = h % 12 || 12;
+    return `${formattedHour}:${minute} ${ampm}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex">
@@ -257,11 +433,15 @@ const shiftDetails = {
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div
-                      className={`w-2 h-2 rounded-full ${isCheckedIn ? 'bg-green-500' : 'bg-slate-300'
+                      className={`w-2 h-2 rounded-full ${isCheckedIn ? 'bg-green-500 animate-pulse' : 'bg-slate-300'
                         }`}
                     ></div>
                     <p className="text-base sm:text-lg font-bold text-slate-800">
-                      {isCheckedIn ? 'Checked In' : 'Not Checked In'}
+                      {attendanceLoading
+                        ? 'Loading...'
+                        : isCheckedIn
+                          ? 'Checked In'
+                          : 'Not Checked In'}
                     </p>
                   </div>
                   {isCheckedIn && punchInTime && (
@@ -276,12 +456,22 @@ const shiftDetails = {
                 </div>
                 <button
                   onClick={() => openPunchModal(isCheckedIn ? 'out' : 'in')}
-                  className={`w-full py-2.5 sm:py-3 px-4 rounded-lg font-semibold transition-all text-sm sm:text-base ${isCheckedIn
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                  disabled={attendanceLoading}
+                  className={`w-full py-2.5 sm:py-3 px-4 rounded-lg font-semibold transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed ${isCheckedIn
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     }`}
                 >
-                  {isCheckedIn ? 'Check Out' : 'Check In'}
+                  {attendanceLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading...
+                    </span>
+                  ) : isCheckedIn ? (
+                    'Check Out'
+                  ) : (
+                    'Check In'
+                  )}
                 </button>
               </div>
 
@@ -338,10 +528,10 @@ const shiftDetails = {
                 <div className="space-y-4">
                   <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                     <p className="text-2xl sm:text-3xl font-bold text-slate-800 mb-1">
-                      {shiftDetails.startTime}
+                      {formatTo12Hour(shiftDetails.startTime)}
                     </p>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      to {shiftDetails.endTime}
+                      to {formatTo12Hour(shiftDetails.endTime)}
                     </p>
                   </div>
 
@@ -373,7 +563,7 @@ const shiftDetails = {
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-gradient-to-br from-slate-400 to-slate-500 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                        SS
+                        {getInitials(shiftDetails.manager)}
                       </div>
                       <p className="text-sm sm:text-base font-semibold text-slate-800">
                         {shiftDetails.manager}
@@ -435,10 +625,10 @@ const shiftDetails = {
                           </p>
                           <span
                             className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${task.priority === 'high'
-                              ? 'bg-red-100 text-red-700'
-                              : task.priority === 'medium'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-green-100 text-green-700'
+                                ? 'bg-red-100 text-red-700'
+                                : task.priority === 'medium'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-green-100 text-green-700'
                               }`}
                           >
                             {task.priority?.charAt(0).toUpperCase() +
@@ -487,18 +677,27 @@ const shiftDetails = {
             <HomeIcon className="w-5 h-5" />
             <span className="text-xs font-medium">Home</span>
           </button>
-          <button className="flex flex-col items-center gap-1 py-2 px-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+          <Link
+            href="/employee/attendance"
+            className="flex flex-col items-center gap-1 py-2 px-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+          >
             <Calendar className="w-5 h-5" />
             <span className="text-xs font-medium">Attendance</span>
-          </button>
-          <button className="flex flex-col items-center gap-1 py-2 px-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+          </Link>
+          <Link
+            href="/employee/tasks"
+            className="flex flex-col items-center gap-1 py-2 px-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+          >
             <CheckSquare className="w-5 h-5" />
             <span className="text-xs font-medium">Tasks</span>
-          </button>
-          <button className="flex flex-col items-center gap-1 py-2 px-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+          </Link>
+          <Link
+            href="/employee/profile"
+            className="flex flex-col items-center gap-1 py-2 px-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+          >
             <User className="w-5 h-5" />
             <span className="text-xs font-medium">Profile</span>
-          </button>
+          </Link>
         </div>
       </nav>
     </div>
