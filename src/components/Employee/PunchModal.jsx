@@ -162,17 +162,15 @@ export default function PunchModal({ type, onClose, onSubmit }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 md:p-6">
-      {/* Modal Container - Responsive Width */}
-      <div className="bg-white w-full max-w-[95vw] sm:max-w-md md:max-w-lg lg:max-w-xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col">
-        
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white w-full max-w-sm mx-4 rounded-3xl shadow-2xl overflow-hidden">
         {/* Header - Minimal */}
-        <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 px-3 py-2.5 sm:px-4 sm:py-3 md:px-5 md:py-4 flex items-center justify-between flex-shrink-0">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white truncate">
+        <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 px-4 py-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-white">
               Mark Attendance
             </h3>
-            <p className="text-[10px] sm:text-xs md:text-sm text-slate-300 mt-0.5">
+            <p className="text-xs text-slate-300 mt-0.5">
               {currentTime.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit'
@@ -181,15 +179,14 @@ export default function PunchModal({ type, onClose, onSubmit }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 sm:p-1.5 md:p-2 hover:bg-white/10 rounded-full transition-colors flex-shrink-0 ml-2"
-            aria-label="Close"
+            className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
           >
-            <IoClose className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+            <IoClose className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          {/* Camera View - Full Width Responsive */}
+        <form onSubmit={handleSubmit} className="p-0">
+          {/* Camera View - Full Width */}
           <div className="relative bg-black">
             {showCamera ? (
               <>
@@ -198,22 +195,22 @@ export default function PunchModal({ type, onClose, onSubmit }) {
                   autoPlay
                   playsInline
                   muted
-                  className="w-full aspect-[3/4] sm:aspect-[9/12] md:aspect-[3/4] object-cover"
+                  className="w-full aspect-[3/4] object-cover"
                   style={{ transform: 'scaleX(-1)' }}
                 />
                 
-                {/* Location Overlay at Top - Responsive */}
-                <div className="absolute top-0 left-0 right-0 p-2 sm:p-3 md:p-4">
-                  <div className="bg-black/60 backdrop-blur-md rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 flex items-start gap-1.5 sm:gap-2">
-                    <IoLocationSharp className="w-3 h-3 sm:w-4 sm:h-4 text-white mt-0.5 flex-shrink-0" />
+                {/* Location Overlay at Top */}
+                <div className="absolute top-0 left-0 right-0 p-4">
+                  <div className="bg-black/60 backdrop-blur-md rounded-xl px-3 py-2 flex items-start gap-2">
+                    <IoLocationSharp className="w-4 h-4 text-white mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       {loadingLocation ? (
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <AiOutlineLoading3Quarters className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white animate-spin" />
-                          <p className="text-[10px] sm:text-xs text-white">Detecting location...</p>
+                        <div className="flex items-center gap-2">
+                          <AiOutlineLoading3Quarters className="w-3 h-3 text-white animate-spin" />
+                          <p className="text-xs text-white">Detecting location...</p>
                         </div>
                       ) : (
-                        <p className="text-[10px] sm:text-xs md:text-sm text-white leading-relaxed line-clamp-2">
+                        <p className="text-xs text-white leading-relaxed line-clamp-2">
                           {formData.location}
                         </p>
                       )}
@@ -221,13 +218,12 @@ export default function PunchModal({ type, onClose, onSubmit }) {
                   </div>
                 </div>
 
-                {/* Capture Button at Bottom - Responsive */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                {/* Capture Button at Bottom */}
+                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
-                      onClick={onClose}
-                      className="text-xs sm:text-sm font-medium text-white px-2 py-1.5 sm:px-4 sm:py-2 hover:bg-white/10 rounded-lg transition-colors"
+                      className="text-sm font-medium text-white px-4 py-2 hover:bg-white/10 rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
@@ -235,17 +231,16 @@ export default function PunchModal({ type, onClose, onSubmit }) {
                     <button
                       type="button"
                       onClick={capturePhoto}
-                      className="relative flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full"
-                      aria-label="Capture photo"
+                      className="relative flex items-center justify-center"
                     >
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-white flex items-center justify-center shadow-lg">
-                        <div className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] md:w-[84px] md:h-[84px] rounded-full bg-blue-500 flex items-center justify-center hover:bg-blue-600 active:scale-95 transition-all">
-                          <BiCamera className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white" />
+                      <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-lg">
+                        <div className="w-[68px] h-[68px] rounded-full bg-blue-500 flex items-center justify-center hover:bg-blue-600 transition-colors">
+                          <BiCamera className="w-8 h-8 text-white" />
                         </div>
                       </div>
                     </button>
 
-                    <div className="w-16 sm:w-20 md:w-24"></div>
+                    <div className="w-20"></div>
                   </div>
                 </div>
               </>
@@ -254,45 +249,45 @@ export default function PunchModal({ type, onClose, onSubmit }) {
                 <img
                   src={formData.photo}
                   alt="Captured"
-                  className="w-full aspect-[3/4] sm:aspect-[9/12] md:aspect-[3/4] object-cover"
+                  className="w-full aspect-[3/4] object-cover"
                 />
                 
-                {/* Location Overlay - Responsive */}
-                <div className="absolute top-0 left-0 right-0 p-2 sm:p-3 md:p-4">
-                  <div className="bg-black/60 backdrop-blur-md rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 flex items-start gap-1.5 sm:gap-2">
-                    <IoLocationSharp className="w-3 h-3 sm:w-4 sm:h-4 text-white mt-0.5 flex-shrink-0" />
-                    <p className="text-[10px] sm:text-xs md:text-sm text-white leading-relaxed line-clamp-2 flex-1">
+                {/* Location Overlay */}
+                <div className="absolute top-0 left-0 right-0 p-4">
+                  <div className="bg-black/60 backdrop-blur-md rounded-xl px-3 py-2 flex items-start gap-2">
+                    <IoLocationSharp className="w-4 h-4 text-white mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-white leading-relaxed line-clamp-2 flex-1">
                       {formData.location}
                     </p>
                   </div>
                 </div>
 
-                {/* Action Buttons - Responsive */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                  <div className="flex gap-2 sm:gap-3">
+                {/* Action Buttons */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                  <div className="flex gap-3">
                     <button
                       type="button"
                       onClick={retakePhoto}
-                      className="flex-1 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-semibold text-white bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl hover:bg-white/30 active:bg-white/40 transition-colors"
+                      className="flex-1 py-3 text-sm font-semibold text-white bg-white/20 backdrop-blur-sm rounded-xl hover:bg-white/30 transition-colors"
                     >
                       Retake
                     </button>
                     <button
                       type="button"
                       onClick={() => {
+                        // Proceed to next step - could expand form here
                         handleSubmit({ preventDefault: () => {} });
                       }}
-                      disabled={isSubmitting}
-                      className="flex-1 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-semibold text-white bg-blue-500 rounded-lg sm:rounded-xl hover:bg-blue-600 active:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 py-3 text-sm font-semibold text-white bg-blue-500 rounded-xl hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
                     >
                       {isSubmitting ? (
                         <>
-                          <AiOutlineLoading3Quarters className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                          <AiOutlineLoading3Quarters className="w-4 h-4 animate-spin" />
                           <span>Submitting...</span>
                         </>
                       ) : (
                         <>
-                          <IoCheckmarkCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <IoCheckmarkCircle className="w-5 h-5" />
                           <span>Confirm</span>
                         </>
                       )}
@@ -304,43 +299,24 @@ export default function PunchModal({ type, onClose, onSubmit }) {
           </div>
 
           <canvas ref={canvasRef} className="hidden" />
+
+          {/* Optional Notes Section - Collapsible */}
+          {/* {!showCamera && (
+            <div className="p-4 border-t border-slate-100">
+              <div className="relative">
+                <HiDocumentText className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Add notes (optional)..."
+                  rows="2"
+                  className="w-full pl-10 pr-3 py-2.5 text-sm text-slate-700 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 resize-none"
+                />
+              </div>
+            </div>
+          )} */}
         </form>
       </div>
-
-      <style jsx>{`
-        /* Smooth transitions */
-        * {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Prevent scroll on background */
-        @media (max-width: 640px) {
-          body {
-            overflow: hidden;
-          }
-        }
-
-        /* Better touch targets */
-        button {
-          min-height: 44px;
-          min-width: 44px;
-        }
-
-        @media (max-width: 640px) {
-          button {
-            min-height: 40px;
-            min-width: 40px;
-          }
-        }
-
-        /* Optimize for notch/safe areas on mobile */
-        @supports (padding: max(0px)) {
-          .fixed {
-            padding-left: max(0.75rem, env(safe-area-inset-left));
-            padding-right: max(0.75rem, env(safe-area-inset-right));
-          }
-        }
-      `}</style>
     </div>
   );
 }
