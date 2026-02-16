@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, Package } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
-import { login } from '../../services/authService';
+import { login, forgotPassword } from '../../services/authService';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -77,12 +77,59 @@ export default function LoginPage() {
     });
   };
 
-  const handleForgotPassword = (e) => {
+  const handleForgotPassword = async (e) => {
     e.preventDefault();
-    toast.info('Password reset link will be sent to your email', {
-      position: 'top-right',
-      autoClose: 3000,
-    });
+    
+    // Validate email before sending
+    if (!email || !email.includes('@')) {
+      toast.error('Please enter a valid email address first', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    try {
+      // Show loading toast
+      const loadingToastId = toast.loading('Sending password reset link...', {
+        position: 'top-right',
+      });
+
+      // Call the forgot password API
+      const response = await forgotPassword(email);
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToastId);
+
+      if (response.success) {
+        toast.success('Password reset link has been sent to your email! Please check your inbox.', {
+          position: 'top-right',
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
+    } catch (error) {
+      // Handle error
+      let errorMessage = 'Failed to send reset link. Please try again.';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      toast.error(errorMessage, {
+        position: 'top-right',
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    }
   };
 
   // Quick login helper for demo (optional - remove in production)
