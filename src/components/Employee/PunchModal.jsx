@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { IoClose, IoLocationSharp, IoCamera, IoCheckmarkCircle } from 'react-icons/io5';
+import { useState, useEffect, useRef } from 'react';
+import { IoClose, IoLocationSharp, IoCheckmarkCircle } from 'react-icons/io5';
 import { MdAccessTime } from 'react-icons/md';
 import { HiDocumentText } from 'react-icons/hi';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
+import { BiCamera } from 'react-icons/bi';
 
 export default function PunchModal({ type, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
@@ -13,9 +14,14 @@ export default function PunchModal({ type, onClose, onSubmit }) {
     photo: null
   });
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [loadingLocation, setLoadingLocation] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [showCamera, setShowCamera] = useState(true);
+  
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // Update time every second
   useEffect(() => {
@@ -25,9 +31,23 @@ export default function PunchModal({ type, onClose, onSubmit }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Get current location and convert to address
+  // Auto-detect location on mount
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
+  // Auto-open camera on mount
+  useEffect(() => {
+    openCamera();
+    
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   const getCurrentLocation = () => {
-    setLoadingLocation(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -37,89 +57,99 @@ export default function PunchModal({ type, onClose, onSubmit }) {
           };
           setCurrentLocation(location);
           
-          // Convert coordinates to address using reverse geocoding
           try {
             const response = await fetch(
               `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`
             );
             const data = await response.json();
-            
-            // Format address nicely
             const address = data.display_name || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`;
             
-            setFormData({
-              ...formData,
+            setFormData(prev => ({
+              ...prev,
               location: address
-            });
+            }));
           } catch (error) {
-            console.error('Error getting address:', error);
-            setFormData({
-              ...formData,
+            setFormData(prev => ({
+              ...prev,
               location: `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`
-            });
+            }));
           }
           
           setLoadingLocation(false);
         },
         (error) => {
-          console.error('Error getting location:', error);
-          setFormData({
-            ...formData,
+          setFormData(prev => ({
+            ...prev,
             location: 'Location unavailable'
-          });
+          }));
           setLoadingLocation(false);
         }
       );
-    } else {
-      setFormData({
-        ...formData,
-        location: 'Geolocation not supported'
-      });
-      setLoadingLocation(false);
     }
   };
 
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({
-          ...formData,
-          photo: reader.result
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Direct camera capture
-  const capturePhoto = async () => {
+  const openCamera = async () => {
     try {
-      // Request camera access
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // Use back camera on mobile
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
       });
       
-      // Trigger file input which will open camera
-      document.getElementById('photo-upload').click();
+      setCameraStream(stream);
       
-      // Stop the stream after a moment
-      setTimeout(() => {
-        stream.getTracks().forEach(track => track.stop());
-      }, 100);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (error) {
       console.error('Camera access denied:', error);
-      // Fallback to file picker
-      document.getElementById('photo-upload').click();
+      alert('Camera access is required for attendance.');
     }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const context = canvas.getContext('2d');
+      // Flip horizontally for selfie
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const photoData = canvas.toDataURL('image/jpeg', 0.9);
+      setFormData(prev => ({
+        ...prev,
+        photo: photoData
+      }));
+      
+      setShowCamera(false);
+      
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    }
+  };
+
+  const retakePhoto = () => {
+    setFormData(prev => ({
+      ...prev,
+      photo: null
+    }));
+    setShowCamera(true);
+    openCamera();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     onSubmit({
@@ -132,226 +162,183 @@ export default function PunchModal({ type, onClose, onSubmit }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-auto transform animate-slideUp">
-        {/* Header */}
-        <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-200 flex items-center justify-between ${
-          type === 'in' 
-            ? 'bg-emerald-500' 
-            : 'bg-red-500'
-        }`}>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <MdAccessTime className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-lg sm:text-xl font-bold text-white">
-                {type === 'in' ? 'Punch In' : 'Punch Out'}
-              </h3>
-              <p className="text-xs sm:text-sm text-white/90">
-                {currentTime.toLocaleTimeString('en-US', { 
-                  hour: '2-digit', 
-                  minute: '2-digit',
-                  second: '2-digit'
-                })}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
-          >
-            <IoClose className="w-6 h-6 text-white" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[calc(100vh-120px)] overflow-y-auto">
-          {/* Current Date & Time Display */}
-          <div className="bg-slate-50 rounded-xl p-3 sm:p-4 border border-slate-200">
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-              <p className="text-xs sm:text-sm font-semibold text-slate-600">Current Date & Time</p>
-              <MdAccessTime className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-            </div>
-            <p className="text-xl sm:text-2xl font-bold text-slate-800">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 md:p-6">
+      {/* Modal Container - Responsive Width */}
+      <div className="bg-white w-full max-w-[95vw] sm:max-w-md md:max-w-lg lg:max-w-xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+        
+        {/* Header - Minimal */}
+        <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 px-3 py-2.5 sm:px-4 sm:py-3 md:px-5 md:py-4 flex items-center justify-between flex-shrink-0">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white truncate">
+              Mark Attendance
+            </h3>
+            <p className="text-[10px] sm:text-xs md:text-sm text-slate-300 mt-0.5">
               {currentTime.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit'
               })}
             </p>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              {currentTime.toLocaleDateString('en-US', { 
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </p>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1 sm:p-1.5 md:p-2 hover:bg-white/10 rounded-full transition-colors flex-shrink-0 ml-2"
+            aria-label="Close"
+          >
+            <IoClose className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+          </button>
+        </div>
 
-          {/* Location */}
-          <div>
-            <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
-              Location
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1 relative min-w-0">
-                <IoLocationSharp className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-slate-400" />
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="Enter location or use GPS"
-                  className="w-full pl-10 sm:pl-11 text-black pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50"
-                  required
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          {/* Camera View - Full Width Responsive */}
+          <div className="relative bg-black">
+            {showCamera ? (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full aspect-[3/4] sm:aspect-[9/12] md:aspect-[3/4] object-cover"
+                  style={{ transform: 'scaleX(-1)' }}
                 />
-              </div>
-              <button
-                type="button"
-                onClick={getCurrentLocation}
-                disabled={loadingLocation}
-                className="px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[44px] sm:min-w-[48px] flex-shrink-0"
-              >
-                {loadingLocation ? (
-                  <AiOutlineLoading3Quarters className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
-                ) : (
-                  <IoLocationSharp className="w-5 h-5 sm:w-6 sm:h-6" />
-                )}
-              </button>
-            </div>
-            {currentLocation && (
-              <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                <IoCheckmarkCircle className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">Location captured successfully</span>
-              </p>
-            )}
-          </div>
+                
+                {/* Location Overlay at Top - Responsive */}
+                <div className="absolute top-0 left-0 right-0 p-2 sm:p-3 md:p-4">
+                  <div className="bg-black/60 backdrop-blur-md rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 flex items-start gap-1.5 sm:gap-2">
+                    <IoLocationSharp className="w-3 h-3 sm:w-4 sm:h-4 text-white mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      {loadingLocation ? (
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <AiOutlineLoading3Quarters className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white animate-spin" />
+                          <p className="text-[10px] sm:text-xs text-white">Detecting location...</p>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] sm:text-xs md:text-sm text-white leading-relaxed line-clamp-2">
+                          {formData.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-          {/* Photo Upload */}
-          <div>
-            <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
-              Take Photo <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoUpload}
-                className="hidden"
-                id="photo-upload"
-                required
-              />
-              <button
-                type="button"
-                onClick={capturePhoto}
-                className="flex items-center justify-center gap-2 w-full px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors"
-              >
-                <IoCamera className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400 flex-shrink-0" />
-                <span className="text-xs sm:text-sm font-medium text-slate-600">
-                  {formData.photo ? 'Photo captured - Tap to retake' : 'Tap to capture photo'}
-                </span>
-              </button>
-            </div>
-            {formData.photo && (
-              <div className="mt-3 relative rounded-lg overflow-hidden">
+                {/* Capture Button at Bottom - Responsive */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="text-xs sm:text-sm font-medium text-white px-2 py-1.5 sm:px-4 sm:py-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={capturePhoto}
+                      className="relative flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full"
+                      aria-label="Capture photo"
+                    >
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-white flex items-center justify-center shadow-lg">
+                        <div className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] md:w-[84px] md:h-[84px] rounded-full bg-blue-500 flex items-center justify-center hover:bg-blue-600 active:scale-95 transition-all">
+                          <BiCamera className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white" />
+                        </div>
+                      </div>
+                    </button>
+
+                    <div className="w-16 sm:w-20 md:w-24"></div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
                 <img
                   src={formData.photo}
                   alt="Captured"
-                  className="w-full h-32 sm:h-40 object-cover"
+                  className="w-full aspect-[3/4] sm:aspect-[9/12] md:aspect-[3/4] object-cover"
                 />
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, photo: null })}
-                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                >
-                  <IoClose className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
-            )}
-            {!formData.photo && (
-              <p className="text-xs text-red-500 mt-2">Photo is required for attendance</p>
+                
+                {/* Location Overlay - Responsive */}
+                <div className="absolute top-0 left-0 right-0 p-2 sm:p-3 md:p-4">
+                  <div className="bg-black/60 backdrop-blur-md rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 flex items-start gap-1.5 sm:gap-2">
+                    <IoLocationSharp className="w-3 h-3 sm:w-4 sm:h-4 text-white mt-0.5 flex-shrink-0" />
+                    <p className="text-[10px] sm:text-xs md:text-sm text-white leading-relaxed line-clamp-2 flex-1">
+                      {formData.location}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action Buttons - Responsive */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                  <div className="flex gap-2 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={retakePhoto}
+                      className="flex-1 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-semibold text-white bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl hover:bg-white/30 active:bg-white/40 transition-colors"
+                    >
+                      Retake
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSubmit({ preventDefault: () => {} });
+                      }}
+                      disabled={isSubmitting}
+                      className="flex-1 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-semibold text-white bg-blue-500 rounded-lg sm:rounded-xl hover:bg-blue-600 active:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <AiOutlineLoading3Quarters className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <IoCheckmarkCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <span>Confirm</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-xs sm:text-sm font-semibold text-black mb-2">
-              Notes (Optional)
-            </label>
-            <div className="relative">
-              <HiDocumentText className="absolute left-3 top-3 w-5 h-5 sm:w-6 sm:h-6 text-black" />
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder={type === 'in' ? 'Starting my shift...' : 'Completed all tasks...'}
-                rows="3"
-                className="w-full pl-10 sm:pl-11 text-black pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full sm:flex-1 px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-200 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-colors order-2 sm:order-1"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !formData.location || !formData.photo}
-              className={`w-full sm:flex-1 px-4 py-2.5 sm:py-3 text-sm sm:text-base rounded-xl font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 order-1 sm:order-2 ${
-                type === 'in'
-                  ? 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600'
-                  : 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <AiOutlineLoading3Quarters className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
-                  <span className="text-sm sm:text-base">Processing...</span>
-                </>
-              ) : (
-                <>
-                  <IoCheckmarkCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                  <span className="text-sm sm:text-base">{type === 'in' ? 'Punch In' : 'Punch Out'}</span>
-                </>
-              )}
-            </button>
-          </div>
+          <canvas ref={canvasRef} className="hidden" />
         </form>
       </div>
 
       <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
+        /* Smooth transitions */
+        * {
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Prevent scroll on background */
+        @media (max-width: 640px) {
+          body {
+            overflow: hidden;
           }
         }
 
-        @keyframes slideUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
+        /* Better touch targets */
+        button {
+          min-height: 44px;
+          min-width: 44px;
+        }
+
+        @media (max-width: 640px) {
+          button {
+            min-height: 40px;
+            min-width: 40px;
           }
         }
 
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.3s ease-out;
+        /* Optimize for notch/safe areas on mobile */
+        @supports (padding: max(0px)) {
+          .fixed {
+            padding-left: max(0.75rem, env(safe-area-inset-left));
+            padding-right: max(0.75rem, env(safe-area-inset-right));
+          }
         }
       `}</style>
     </div>

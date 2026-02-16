@@ -26,7 +26,7 @@ export default function Sidebar({ isOpen, onClose, currentPage = 'home' }) {
     { id: 'attendance', label: 'Attendance', icon: Calendar, href: '/employee/attendance' },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, href: '/employee/tasks' },
     { id: 'workLogs', label: 'Work Logs', icon: Briefcase, href: '/employee/work-logs' },
-    // { id: 'performance', label: 'Performance', icon: BarChart3, href: '/employee/performance' },
+    { id: 'performance', label: 'Performance', icon: BarChart3, href: '/employee/performance' },
     { id: 'profile', label: 'Profile', icon: User, href: '/employee/profile' },
   ];
 
