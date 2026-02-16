@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { FiMail, FiArrowLeft, FiCheck } from 'react-icons/fi';
 import Link from 'next/link';
+import { forgotPassword } from '../../services/authService';
+import { toast } from 'react-toastify';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -14,7 +16,23 @@ export default function ForgotPassword() {
     e.preventDefault();
     
     if (!email) {
-      setError('Please enter your email address');
+      const errorMsg = 'Please enter your email address';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Validate email format
+    if (!email.includes('@')) {
+      const errorMsg = 'Please enter a valid email address';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -22,23 +40,29 @@ export default function ForgotPassword() {
     setError('');
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
+      const response = await forgotPassword(email);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.success) {
         setSuccess(true);
+        toast.success('Password reset link sent successfully!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
       } else {
-        setError(data.message || 'Failed to send reset email');
+        const errorMsg = response.message || 'Failed to send reset email';
+        setError(errorMsg);
+        toast.error(errorMsg, {
+          position: 'top-right',
+          autoClose: 3000,
+        });
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      const errorMessage = err.response?.data?.message || err.message || 'Network error. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
     } finally {
       setLoading(false);
     }
@@ -75,12 +99,24 @@ export default function ForgotPassword() {
             Didn't receive the email? Check your spam folder or try again in a few minutes.
           </p>
           
-          <Link 
-            href="/"
-            className="block w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg transition-colors"
-          >
-            Back to Login
-          </Link>
+          <div className="space-y-3">
+            <Link 
+              href="/"
+              className="block w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg transition-colors"
+            >
+              Back to Login
+            </Link>
+            
+            <button
+              onClick={() => {
+                setSuccess(false);
+                setEmail('');
+              }}
+              className="block w-full text-teal-600 hover:text-teal-700 font-medium py-2"
+            >
+              Send to Different Email
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -125,6 +161,7 @@ export default function ForgotPassword() {
                 placeholder="Enter your email"
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 disabled={loading}
+                required
               />
             </div>
           </div>
@@ -140,7 +177,7 @@ export default function ForgotPassword() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Sending...
+                Sending Reset Link...
               </span>
             ) : (
               'Send Reset Link'
@@ -157,6 +194,16 @@ export default function ForgotPassword() {
             <FiArrowLeft className="w-4 h-4 mr-2" />
             Back to Login
           </Link>
+        </div>
+
+        {/* Additional Help */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <p className="text-xs text-gray-500 text-center">
+            Having trouble? Contact our support team at{' '}
+            <a href="mailto:support@marketing360.com" className="text-teal-600 hover:text-teal-700 font-medium">
+              support@marketing360.com
+            </a>
+          </p>
         </div>
       </div>
     </div>

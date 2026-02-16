@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { FiLock, FiEye, FiEyeOff, FiCheck, FiX } from 'react-icons/fi';
 import Link from 'next/link';
+import { verifyResetToken, resetPassword } from '../../services/authService';
+import { toast } from 'react-toastify';
 
 export default function ResetPassword() {
   const searchParams = useSearchParams();
@@ -42,37 +44,42 @@ export default function ResetPassword() {
 
   // Verify token on component mount
   useEffect(() => {
-    const verifyToken = async () => {
+    const verifyTokenAsync = async () => {
       if (!token) {
-        setError('Invalid reset link');
+        setError('Invalid reset link - No token provided');
         setVerifying(false);
         setTokenValid(false);
         return;
       }
 
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/auth/verify-reset-token/${token}`
-        );
+        const response = await verifyResetToken(token);
 
-        const data = await response.json();
-
-        if (data.success) {
+        if (response.success) {
           setTokenValid(true);
-          setUserEmail(data.data.email);
+          setUserEmail(response.data.email);
+          toast.success('Reset link verified successfully!', {
+            position: 'top-right',
+            autoClose: 2000,
+          });
         } else {
           setTokenValid(false);
-          setError(data.message || 'Invalid or expired reset link');
+          setError(response.message || 'Invalid or expired reset link');
         }
       } catch (err) {
         setTokenValid(false);
-        setError('Failed to verify reset link');
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to verify reset link';
+        setError(errorMessage);
+        toast.error(errorMessage, {
+          position: 'top-right',
+          autoClose: 3000,
+        });
       } finally {
         setVerifying(false);
       }
     };
 
-    verifyToken();
+    verifyTokenAsync();
   }, [token]);
 
   const handleSubmit = async (e) => {
@@ -81,50 +88,66 @@ export default function ResetPassword() {
 
     // Validation
     if (!password || !confirmPassword) {
-      setError('Please fill in all fields');
+      const errorMsg = 'Please fill in all fields';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      const errorMsg = 'Password must be at least 6 characters long';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      const errorMsg = 'Passwords do not match';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            token,
-            newPassword: password,
-          }),
-        }
-      );
+      const response = await resetPassword(token, password);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.success) {
         setSuccess(true);
+        toast.success('Password reset successful! Redirecting to login...', {
+          position: 'top-right',
+          autoClose: 2000,
+        });
+        
         // Redirect to login after 3 seconds
         setTimeout(() => {
           router.push('/');
         }, 3000);
       } else {
-        setError(data.message || 'Failed to reset password');
+        const errorMsg = response.message || 'Failed to reset password';
+        setError(errorMsg);
+        toast.error(errorMsg, {
+          position: 'top-right',
+          autoClose: 3000,
+        });
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      const errorMessage = err.response?.data?.message || err.message || 'Network error. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
     } finally {
       setLoading(false);
     }
