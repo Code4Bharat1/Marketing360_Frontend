@@ -37,7 +37,7 @@ export const register = async (userData) => {
 export const logout = () => {
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
-  window.location.href = '/';
+  window.location.href = '/login';
 };
 
 // Get current user
@@ -83,4 +83,37 @@ export const isAuthenticated = () => {
 export const getUserFromStorage = () => {
   const user = localStorage.getItem('user');
   return user ? JSON.parse(user) : null;
+};
+
+// Forgot password - send reset email
+export const forgotPassword = async (email) => {
+  try {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Reset password with token
+export const resetPassword = async (token, newPassword) => {
+  try {
+    const response = await api.post('/auth/reset-password', {
+      token,
+      newPassword
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Verify reset token
+export const verifyResetToken = async (token) => {
+  try {
+    const response = await api.get(`/auth/verify-reset-token/${token}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 };
