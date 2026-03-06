@@ -38,7 +38,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     
-    console.error('API Error:', error.response?.data || error.message);
+    console.  error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
 );
@@ -244,6 +244,21 @@ export const batchCalculatePerformance = async (employeeIds, period, startDate, 
 };
 
 // ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Get start and end date boundaries for a named period like "October 2026"
+ * @param {string} period - e.g. "October 2026"
+ */
+export const getMonthBoundaries = (period) => {
+  const date = new Date(period);
+  const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+  const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  endDate.setHours(23, 59, 59, 999);
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0],
+  };
+};
 
 /**
  * Get date range for period
@@ -519,6 +534,7 @@ export default {
   getDepartmentPerformance,
   updatePerformanceReview,
   batchCalculatePerformance,
+  getMonthBoundaries,
   getDateRangeForPeriod,
   formatPerformanceData,
   getPerformanceColor,

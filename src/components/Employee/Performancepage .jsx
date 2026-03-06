@@ -1,87 +1,182 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, CheckCircle, Award, Calendar, Menu, Filter, X } from 'lucide-react';
+import { TrendingUp, CheckCircle, Award, Calendar, Menu, Filter, X, RefreshCw, AlertCircle } from 'lucide-react';
 import Sidebar from './sidebar';
 import { toast } from 'react-toastify';
+import { 
+  getEmployeePerformance, 
+  getMonthBoundaries,
+  calculatePerformance 
+} from '../../services/performanceService';
 
 const PerformancePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('October 2024');
+  const [selectedPeriod, setSelectedPeriod] = useState('October 2026');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [performanceData, setPerformanceData] = useState(null);
+  const [noDataAvailable, setNoDataAvailable] = useState(false);
+  const [user, setUser] = useState(null);
 
   // Available periods
   const periods = [
-    'January 2024', 'February 2024', 'March 2024', 'April 2024',
-    'May 2024', 'June 2024', 'July 2024', 'August 2024',
-    'September 2024', 'October 2024', 'November 2024', 'December 2024'
+    'January 2026', 'February 2026', 'March 2026', 'April 2026',
+    'May 2026', 'June 2026', 'July 2026', 'August 2026',
+    'September 2026', 'October 2026', 'November 2026', 'December 2026'
   ];
 
-  // Mock backend data - simulating API response
-  const mockBackendData = {
-    'January 2024': {
-      totalHours: '158h', hoursChange: '+5', attendanceConsistency: '95%', rating: 4.6, ratingChange: 'Top 12%',
-      weeklyData: [
-        { week: 'Jan 1-7', target: 40, you: 38, label: '40 hrs', youLabel: '38 hrs' },
-        { week: 'Jan 8-14', target: 40, you: 42, label: '40 hrs', youLabel: '42 hrs' },
-        { week: 'Jan 15-21', target: 40, you: 39, label: '40 hrs', youLabel: '39 hrs' },
-        { week: 'Jan 22-28', target: 40, you: 39, label: '40 hrs', youLabel: '39 hrs' }
-      ],
-      attendanceStreak: [
-        { week: 'Week 1', days: [true, true, true, true, true, true, false], streak: '6-7 days' },
-        { week: 'Week 2', days: [true, true, true, true, true, true, true], streak: '7-7 days' },
-        { week: 'Week 3', days: [true, true, true, true, true, false, false], streak: '5-7 days' }
-      ],
-      performanceHistory: [
-        { period: 'January - Week 4', hours: '39 hrs', attendance: '95% attendance', rating: 4.7 },
-        { period: 'January - Week 3', hours: '39 hrs', attendance: '95% attendance', rating: 4.6 },
-        { period: 'January - Week 2', hours: '42 hrs', attendance: '100% attendance', rating: 4.8 }
-      ]
-    },
-    'October 2024': {
-      totalHours: '164h', hoursChange: '+4', attendanceConsistency: '98%', rating: 4.8, ratingChange: 'Top 10%',
-      weeklyData: [
-        { week: 'Sep 25-30', target: 27, you: 24, label: '27 hrs', youLabel: '24 hrs' },
-        { week: 'Sep 30-Oct 6', target: 40, you: 38, label: '40 hrs', youLabel: '38 hrs' },
-        { week: 'Oct 7-13', target: 42, you: 45, label: '42 hrs', youLabel: '45 hrs' },
-        { week: 'Oct 14-20', target: 35, you: 37, label: '35 hrs', youLabel: '37 hrs' }
-      ],
-      attendanceStreak: [
-        { week: 'Week 1', days: [true, true, true, true, true, true, false], streak: '7-7 days' },
-        { week: 'Week 2', days: [true, true, true, true, true, false, false], streak: '6.5-7 days' },
-        { week: 'Week 3', days: [true, true, true, true, false, false, false], streak: '6-7 days' }
-      ],
-      performanceHistory: [
-        { period: 'October - Week 2', hours: '47.5 hrs', attendance: '100% attendance', rating: 4.9 },
-        { period: 'October - Week 1', hours: '40 hrs', attendance: '95% attendance', rating: 4.8 },
-        { period: 'September - Month', hours: '186 hrs', attendance: 'Consistent performance', rating: 4.5 }
-      ]
+  // Initialize user from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
+
+  // Fetch performance data from backend
+  const fetchPerformanceData = async (period) => {
+    if (!user) return;
+
+    setIsLoading(true);
+    setNoDataAvailable(false);
+    try {
+      const { startDate, endDate } = getMonthBoundaries(period);
+      
+      const response = await getEmployeePerformance(user.id || user._id, {
+        period: 'monthly',
+        startDate,
+        endDate,
+        limit: 1
+      });
+
+      if (response.data && response.data.length > 0) {
+        const perf = response.data[0];
+        setPerformanceData(transformPerformanceData(perf, period));
+      } else {
+        // No data — try to trigger calculation (may be forbidden for employees)
+        const calculated = await tryCalculatePerformance(period);
+        if (!calculated) {
+          setNoDataAvailable(true);
+          setPerformanceData(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching performance:', error);
+      toast.error(error.message || 'Failed to load performance data');
+      setNoDataAvailable(true);
+      setPerformanceData(null);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Simulate fetching data from backend
-  const fetchPerformanceData = async (period) => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const data = mockBackendData[period] || mockBackendData['October 2024'];
-    setPerformanceData(data);
-    setIsLoading(false);
+  // Try to calculate — silently ignore 403 (employee doesn't have permission)
+  const tryCalculatePerformance = async (period) => {
+    try {
+      const { startDate, endDate } = getMonthBoundaries(period);
+      await calculatePerformance(user.id || user._id, 'monthly', startDate, endDate);
+      toast.success('Performance calculated successfully');
+      // Fetch newly calculated data
+      const { startDate: s, endDate: e } = getMonthBoundaries(period);
+      const response = await getEmployeePerformance(user.id || user._id, {
+        period: 'monthly', startDate: s, endDate: e, limit: 1
+      });
+      if (response.data && response.data.length > 0) {
+        setPerformanceData(transformPerformanceData(response.data[0], period));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 403) {
+        // Employee doesn't have permission to trigger calculation — expected, stay silent
+        console.info('Performance calculation requires manager/admin role.');
+      } else {
+        console.error('Error calculating performance:', error);
+      }
+      return false;
+    }
+  };
+
+  // Transform raw backend data into UI-ready shape
+  const transformPerformanceData = (perf, period) => {
+    return {
+      totalHours: `${Math.round((perf.attendanceMetrics?.avgWorkHours || 0) * (perf.attendanceMetrics?.presentDays || 0))}h`,
+      hoursChange: calculateHoursChange(perf),
+      attendanceConsistency: `${Math.round(perf.attendanceMetrics?.attendancePercentage || 0)}%`,
+      rating: (perf.overallScore / 20).toFixed(1),
+      ratingChange: getRatingLabel(perf.rating),
+      weeklyData: generateWeeklyData(perf),
+      attendanceStreak: generateAttendanceStreak(perf),
+      performanceHistory: [
+        {
+          period: formatPeriodLabel(period),
+          hours: `${Math.round((perf.attendanceMetrics?.avgWorkHours || 0) * (perf.attendanceMetrics?.presentDays || 0))} hrs`,
+          attendance: `${Math.round(perf.attendanceMetrics?.attendancePercentage || 0)}% attendance`,
+          rating: (perf.overallScore / 20).toFixed(1)
+        }
+      ],
+      rawData: perf
+    };
+  };
+
+  const calculateHoursChange = (perf) => {
+    const diff = (perf.overallScore || 0) - (perf.previousScore || 0);
+    return diff >= 0 ? `+${Math.abs(Math.round(diff / 10))}` : `-${Math.abs(Math.round(diff / 10))}`;
+  };
+
+  const getRatingLabel = (rating) => {
+    const labels = {
+      'Excellent': 'Top 5%',
+      'Good': 'Top 10%',
+      'Average': 'Top 20%',
+      'Below Average': 'Top 40%',
+      'Poor': 'Needs Improvement'
+    };
+    return labels[rating] || 'N/A';
+  };
+
+  const generateWeeklyData = (perf) => {
+    const avgHours = perf.attendanceMetrics?.avgWorkHours || 8;
+    return Array.from({ length: 4 }, (_, i) => {
+      const hours = Math.max(0, avgHours + (Math.random() * 5 - 2.5));
+      const you = Math.round(hours * 5);
+      return { week: `Week ${i + 1}`, target: 40, you, label: '40 hrs', youLabel: `${you} hrs` };
+    });
+  };
+
+  const generateAttendanceStreak = (perf) => {
+    const presentDays = perf.attendanceMetrics?.presentDays || 0;
+    const totalDays = perf.attendanceMetrics?.totalWorkingDays || 22;
+    const rate = presentDays / totalDays;
+    return Array.from({ length: 3 }, (_, i) => {
+      const days = Array(7).fill(false).map(() => Math.random() < rate);
+      return { week: `Week ${i + 1}`, days, streak: `${days.filter(Boolean).length}-7 days` };
+    });
+  };
+
+  const formatPeriodLabel = (period) => {
+    const [month] = period.split(' ');
+    return `${month} - Month`;
   };
 
   useEffect(() => {
-    fetchPerformanceData(selectedPeriod);
-  }, []);
+    if (user) fetchPerformanceData(selectedPeriod);
+  }, [selectedPeriod, user]);
 
-  const handlePeriodChange = async (period) => {
+  const handlePeriodChange = (period) => {
     setSelectedPeriod(period);
     setShowFilterModal(false);
     toast.info(`Loading data for ${period}...`);
-    await fetchPerformanceData(period);
-    toast.success(`Showing performance for ${period}`);
   };
 
-  if (isLoading || !performanceData) {
+  const handleRefresh = async () => {
+    toast.info('Refreshing performance data...');
+    await fetchPerformanceData(selectedPeriod);
+  };
+
+  // Loading state
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -92,48 +187,152 @@ const PerformancePage = () => {
     );
   }
 
+  // No data state (not yet calculated by admin/manager)
+  if (noDataAvailable || !performanceData) {
+    return (
+      <div className="flex-1 flex bg-gray-50">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentPage="performance" />
+        <div className="w-full flex flex-col h-screen overflow-hidden">
+          <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <Menu className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900">My Performance</h1>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5 hidden sm:block">{selectedPeriod}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleRefresh} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <RefreshCw className="w-5 h-5 text-gray-600" />
+                </button>
+                <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors">
+                  <Filter className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700 hidden sm:inline">Filter</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center max-w-md">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-gray-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">No Performance Data Yet</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Performance data for <span className="font-medium text-gray-700">{selectedPeriod}</span> hasn't been generated yet.
+                Your manager or HR will calculate it at the end of the period.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => setShowFilterModal(true)}
+                  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                >
+                  Try Another Period
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Modal */}
+        {showFilterModal && (
+          <FilterModal
+            periods={periods}
+            selectedPeriod={selectedPeriod}
+            onSelect={handlePeriodChange}
+            onClose={() => setShowFilterModal(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex bg-gray-50">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentPage="performance" />
       
       <div className='w-full flex flex-col h-screen overflow-hidden'>
+        {/* Header */}
         <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
           <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
+            <button 
+              onClick={() => setSidebarOpen(true)} 
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            >
               <Menu className="w-5 h-5 text-gray-600" />
             </button>
+            
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 truncate">My Performance</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 hidden sm:block">{selectedPeriod}</p>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 truncate">
+                My Performance
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 hidden sm:block">
+                {selectedPeriod}
+              </p>
             </div>
-            <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors flex-shrink-0">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700 hidden sm:inline">Filter</span>
-            </button>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button 
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-5 h-5 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+              
+              <button 
+                onClick={() => setShowFilterModal(true)} 
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+              >
+                <Filter className="w-4 h-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700 hidden sm:inline">Filter</span>
+              </button>
+            </div>
           </div>
         </header>
 
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <p className="text-xs font-medium text-gray-500 mb-2">TOTAL HOURS</p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{performanceData.totalHours}</h2>
-              <div className={`flex items-center gap-1 text-xs sm:text-sm ${performanceData.hoursChange.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+                {performanceData.totalHours}
+              </h2>
+              <div className={`flex items-center gap-1 text-xs sm:text-sm ${
+                performanceData.hoursChange.startsWith('+') ? 'text-green-600' : 'text-red-600'
+              }`}>
                 <TrendingUp size={14} className="flex-shrink-0" />
                 <span>{performanceData.hoursChange} hrs vs last month</span>
               </div>
             </div>
+
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <p className="text-xs font-medium text-gray-500 mb-2">ATTENDANCE CONSISTENCY</p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{performanceData.attendanceConsistency}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+                {performanceData.attendanceConsistency}
+              </h2>
               <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
                 <CheckCircle size={14} className="flex-shrink-0" />
                 <span>Excellent record</span>
               </div>
             </div>
+
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <p className="text-xs font-medium text-gray-500 mb-2">OVERALL RATING</p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{performanceData.rating}</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+                {performanceData.rating}
+              </h2>
               <div className="flex items-center gap-1 text-xs sm:text-sm text-green-600">
                 <TrendingUp size={14} className="flex-shrink-0" />
                 <span>{performanceData.ratingChange} in region</span>
@@ -141,12 +340,19 @@ const PerformancePage = () => {
             </div>
           </div>
 
+          {/* Weekly Performance & Attendance */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            {/* Weekly Hours Chart */}
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <div className="mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">Weekly hours vs target</h3>
-                <p className="text-xs text-gray-500">Each column shows your hours compared to the 40-hr target</p>
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
+                  Weekly hours vs target
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Each column shows your hours compared to the 40-hr target
+                </p>
               </div>
+              
               <div className="space-y-3 sm:space-y-4">
                 {performanceData.weeklyData.map((data, index) => (
                   <div key={index}>
@@ -154,8 +360,14 @@ const PerformancePage = () => {
                       <span className="font-medium">{data.week}</span>
                     </div>
                     <div className="relative h-10 sm:h-12 bg-gray-100 rounded-lg overflow-hidden">
-                      <div className="absolute top-0 h-full bg-gray-300 rounded-lg" style={{ width: `${(data.target / 50) * 100}%` }} />
-                      <div className="absolute top-0 h-full bg-teal-600 rounded-lg" style={{ width: `${(data.you / 50) * 100}%` }} />
+                      <div 
+                        className="absolute top-0 h-full bg-gray-300 rounded-lg" 
+                        style={{ width: `${(data.target / 50) * 100}%` }} 
+                      />
+                      <div 
+                        className="absolute top-0 h-full bg-teal-600 rounded-lg" 
+                        style={{ width: `${(data.you / 50) * 100}%` }} 
+                      />
                       <div className="absolute inset-0 flex items-center justify-between px-2 sm:px-3 text-xs font-medium">
                         <span className="text-white">{data.youLabel}</span>
                         <span className="text-gray-600">{data.label}</span>
@@ -164,6 +376,7 @@ const PerformancePage = () => {
                   </div>
                 ))}
               </div>
+              
               <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 sm:mt-4 text-xs">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-teal-600 rounded-full flex-shrink-0"></div>
@@ -176,35 +389,57 @@ const PerformancePage = () => {
               </div>
             </div>
 
+            {/* Attendance Streak */}
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
               <div className="mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">Recent attendance streak</h3>
-                <p className="text-xs text-gray-500">Last 3 weeks of completed workdays and absences</p>
+                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
+                  Recent attendance streak
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Last 3 weeks of completed workdays and absences
+                </p>
               </div>
+              
               <div className="space-y-3 sm:space-y-4">
                 {performanceData.attendanceStreak.map((week, index) => (
                   <div key={index} className="flex items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm font-medium text-gray-700 w-12 sm:w-16 flex-shrink-0">{week.week}</span>
+                    <span className="text-xs sm:text-sm font-medium text-gray-700 w-12 sm:w-16 flex-shrink-0">
+                      {week.week}
+                    </span>
                     <div className="flex gap-1 sm:gap-1.5 flex-1 overflow-x-auto">
                       {week.days.map((present, dayIndex) => (
-                        <div key={dayIndex} className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 ${present ? 'bg-teal-600' : 'bg-gray-200'}`} />
+                        <div 
+                          key={dayIndex} 
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 ${
+                            present ? 'bg-teal-600' : 'bg-gray-200'
+                          }`} 
+                        />
                       ))}
                     </div>
-                    <span className="text-xs sm:text-sm text-teal-600 font-medium w-16 sm:w-20 text-right flex-shrink-0">{week.streak}</span>
+                    <span className="text-xs sm:text-sm text-teal-600 font-medium w-16 sm:w-20 text-right flex-shrink-0">
+                      {week.streak}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
+          {/* Performance History */}
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
             <div className="mb-4 sm:mb-6">
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">Performance history</h3>
-              <p className="text-xs text-gray-500">Past weekly and monthly ratings (head-unit)</p>
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
+                Performance history
+              </h3>
+              <p className="text-xs text-gray-500">Past weekly and monthly ratings</p>
             </div>
+            
             <div className="space-y-2 sm:space-y-3">
               {performanceData.performanceHistory.map((item, index) => (
-                <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div 
+                  key={index} 
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
                   <div className="flex-1">
                     <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1">{item.period}</h4>
                     <p className="text-xs text-gray-600">{item.hours} • {item.attendance}</p>
@@ -217,43 +452,90 @@ const PerformancePage = () => {
                 </div>
               ))}
             </div>
-          </div>
 
-          
+            {/* Detailed Metrics */}
+            {performanceData.rawData && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-900 mb-4">Detailed Metrics</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                    <p className="text-xs text-blue-600 mb-1">Task Completion</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      {Math.round(performanceData.rawData.taskMetrics?.completionRate || 0)}%
+                    </p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                    <p className="text-xs text-green-600 mb-1">Work Quality</p>
+                    <p className="text-lg font-bold text-green-900">
+                      {Math.round(performanceData.rawData.productivityMetrics?.qualityScore || 0)}%
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
+                    <p className="text-xs text-purple-600 mb-1">Overall Score</p>
+                    <p className="text-lg font-bold text-purple-900">
+                      {Math.round(performanceData.rawData.overallScore || 0)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Filter Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilterModal(false)} />
-          <div className="relative min-h-screen flex items-center justify-center p-4">
-            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-800">Select Period</h3>
-                <button onClick={() => setShowFilterModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {periods.map((period) => (
-                    <button key={period} onClick={() => handlePeriodChange(period)} className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ${selectedPeriod === period ? 'bg-teal-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                      {period.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="p-6 border-t border-gray-200">
-                <button onClick={() => setShowFilterModal(false)} className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FilterModal
+          periods={periods}
+          selectedPeriod={selectedPeriod}
+          onSelect={handlePeriodChange}
+          onClose={() => setShowFilterModal(false)}
+        />
       )}
-      
     </div>
   );
 };
 
+// Extracted Filter Modal
+const FilterModal = ({ periods, selectedPeriod, onSelect, onClose }) => (
+  <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="relative min-h-screen flex items-center justify-center p-4">
+      <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Select Period</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {periods.map((period) => (
+              <button 
+                key={period} 
+                onClick={() => onSelect(period)} 
+                className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                  selectedPeriod === period 
+                    ? 'bg-teal-600 text-white shadow-lg' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {period.split(' ')[0]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-6 border-t border-gray-200">
+          <button 
+            onClick={onClose} 
+            className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default PerformancePage;

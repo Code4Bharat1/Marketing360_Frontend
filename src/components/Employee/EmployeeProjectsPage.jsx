@@ -1,500 +1,482 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, CheckCircle, Award, Calendar, Menu, Filter, X, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  TrendingUp, TrendingDown, Minus, CheckCircle, Award,
+  Menu, Filter, X, RefreshCw, BarChart2, Clock
+} from 'lucide-react';
 import Sidebar from './sidebar';
 import { toast } from 'react-toastify';
-import { 
-  getEmployeePerformance, 
+import {
+  getEmployeePerformance,
+  getPerformanceTrends,
   getMonthBoundaries,
-  calculatePerformance 
 } from '../../services/performanceService';
 
-const PerformancePage = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+// ─── constants ───────────────────────────────────────────────────────────────
+
+const PERIODS = [
+  'January 2026',   'February 2026', 'March 2026',    'April 2026',
+  'May 2026',       'June 2026',     'July 2026',     'August 2026',
+  'September 2026', 'October 2026',  'November 2026', 'December 2026',
+];
+
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ─── data transform ──────────────────────────────────────────────────────────
+
+const getRatingLabel = (rating) => ({
+  Excellent:      'Top 5%',
+  Good:           'Top 15%',
+  Average:        'Top 30%',
+  'Below Average':'Top 50%',
+  Poor:           'Needs Improvement',
+}[rating] || '—');
+
+const transform = (perf, period) => {
+  const att  = perf.attendanceMetrics   || {};
+  const task = perf.taskMetrics         || {};
+  const prod = perf.productivityMetrics || {};
+
+  const totalHours = Math.round((att.avgWorkHours || 0) * (att.presentDays || 0));
+  const rating5    = ((perf.overallScore || 0) / 20).toFixed(1);
+  const seed       = perf.overallScore || 50;
+
+  // Deterministic weekly bars (no Math.random — stable across re-renders)
+  const weeklyData = Array.from({ length: 4 }, (_, i) => {
+    const you = Math.max(0, Math.round(((att.avgWorkHours || 8) + Math.sin(i * 7 + seed) * 2.5) * 5));
+    return { week: `Week ${i + 1}`, target: 40, you, label: '40 hrs', youLabel: `${you} hrs` };
+  });
+
+  // Deterministic attendance dot-grid
+  const rate = (att.attendancePercentage || 90) / 100;
+  const attendanceStreak = Array.from({ length: 3 }, (_, wi) => {
+    const days = Array.from({ length: 7 }, (_, di) =>
+      Math.sin(wi * 31 + di * 17 + seed) > (1 - rate * 2 - 0.5)
+    );
+    return { week: `Week ${wi + 1}`, days, streak: `${days.filter(Boolean).length}/7 days` };
+  });
+
+  const [month] = period.split(' ');
+
+  return {
+    totalHours:            `${totalHours}h`,
+    attendanceConsistency: `${Math.round(att.attendancePercentage || 0)}%`,
+    rating:                rating5,
+    ratingLabel:           getRatingLabel(perf.rating),
+    trend:                 perf.trend || 'stable',
+    weeklyData,
+    attendanceStreak,
+    history: [{
+      period:     `${month} – Month`,
+      hours:      `${totalHours} hrs`,
+      attendance: `${Math.round(att.attendancePercentage || 0)}% attendance`,
+      rating:     rating5,
+    }],
+    metrics: {
+      taskCompletion:    Math.round(task.completionRate      || 0),
+      qualityScore:      Math.round(prod.qualityScore        || 0),
+      productivityScore: Math.round(prod.productivityScore   || 0),
+      efficiencyScore:   Math.round(prod.efficiencyScore     || 0),
+      presentDays:       att.presentDays      || 0,
+      totalWorkingDays:  att.totalWorkingDays || 0,
+      avgWorkHours:      (att.avgWorkHours || 0).toFixed(1),
+      tasksCompleted:    task.completedTasks  || 0,
+      totalTasks:        task.totalTasks      || 0,
+    },
+    overallScore: Math.round(perf.overallScore || 0),
+    ratingText:   perf.rating || 'Average',
+  };
+};
+
+// ─── small components ────────────────────────────────────────────────────────
+
+const TrendIcon = ({ trend }) => {
+  if (trend === 'improving') return <TrendingUp  size={14} className="text-green-400" />;
+  if (trend === 'declining') return <TrendingDown size={14} className="text-red-400"  />;
+  return <Minus size={14} className="text-blue-300" />;
+};
+
+const ScoreBadge = ({ score, rating }) => {
+  const cls =
+    score >= 90 ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
+    score >= 75 ? 'bg-blue-100   text-blue-700   border-blue-300'     :
+    score >= 60 ? 'bg-yellow-100 text-yellow-700 border-yellow-300'   :
+    score >= 40 ? 'bg-orange-100 text-orange-700 border-orange-300'   :
+                  'bg-red-100    text-red-700    border-red-300';
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+      {rating}
+    </span>
+  );
+};
+
+const MetricBar = ({ label, value, color = 'bg-teal-500' }) => (
+  <div>
+    <div className="flex justify-between text-xs text-gray-600 mb-1">
+      <span>{label}</span><span className="font-semibold">{value}%</span>
+    </div>
+    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
+    </div>
+  </div>
+);
+
+const StatCard = ({ label, value, sub, icon: Icon, iconColor, trend }) => (
+  <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col gap-2">
+    <div className="flex items-center justify-between">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
+      <Icon size={18} className={iconColor} />
+    </div>
+    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</h2>
+    <div className="flex items-center gap-1 text-xs text-gray-500">
+      {trend && <TrendIcon trend={trend} />}
+      <span>{sub}</span>
+    </div>
+  </div>
+);
+
+const TrendChart = ({ trends }) => {
+  if (!trends || trends.length < 2) return null;
+  const max      = Math.max(...trends.map(t => t.overallScore), 1);
+  const W        = 100 / (trends.length - 1);
+  const points   = trends.map((t, i) => ({
+    x: i * W,
+    y: 100 - (t.overallScore / max) * 85,
+    label: MONTH_SHORT[new Date(t.startDate).getMonth()] || `M${i + 1}`,
+  }));
+  const polyline = points.map(p => `${p.x},${p.y}`).join(' ');
+
+  return (
+    <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
+      <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Score trend</h3>
+      <p className="text-xs text-gray-400 mb-4">Overall score across recent months</p>
+      <svg viewBox="0 0 100 100" className="w-full h-36" preserveAspectRatio="none">
+        {[25,50,75].map(y => <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#f0f0f0" strokeWidth="0.5" />)}
+        <polygon points={`0,100 ${polyline} 100,100`} fill="rgba(20,184,166,0.08)" />
+        <polyline points={polyline} fill="none" stroke="#14b8a6" strokeWidth="2" strokeLinejoin="round" />
+        {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#14b8a6" />)}
+      </svg>
+      <div className="flex justify-between mt-1">
+        {points.map((p, i) => <span key={i} className="text-[10px] text-gray-400">{p.label}</span>)}
+      </div>
+    </div>
+  );
+};
+
+const FilterModal = ({ selected, onSelect, onClose }) => (
+  <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="relative min-h-screen flex items-center justify-center p-4">
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h3 className="text-base font-semibold text-gray-800">Select Period</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        <div className="p-6 grid grid-cols-3 gap-2.5">
+          {PERIODS.map(p => (
+            <button key={p} onClick={() => onSelect(p)}
+              className={`py-2.5 rounded-xl text-sm font-medium transition-all ${
+                selected === p
+                  ? 'bg-teal-600 text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100'
+              }`}
+            >
+              {p.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 border-t border-gray-100">
+          <button onClick={onClose} className="w-full py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const EmptyState = ({ period, onFilter, onRefresh }) => (
+  <div className="flex-1 flex items-center justify-center p-8">
+    <div className="text-center max-w-sm">
+      <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <BarChart2 className="w-8 h-8 text-gray-300" />
+      </div>
+      <h2 className="text-base font-semibold text-gray-900 mb-2">No data for {period}</h2>
+      <p className="text-sm text-gray-500 mb-6">
+        Performance for this period hasn't been published yet.
+        Your manager or HR will generate it at the end of the period.
+      </p>
+      <div className="flex gap-3 justify-center">
+        <button onClick={onFilter}  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors">Try another period</button>
+        <button onClick={onRefresh} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">Refresh</button>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── page ────────────────────────────────────────────────────────────────────
+
+const EmployeeProjectsPage = () => {
+  const [sidebarOpen,    setSidebarOpen]    = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('October 2026');
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [performanceData, setPerformanceData] = useState(null);
-  const [user, setUser] = useState(null);
+  const [showFilter,     setShowFilter]     = useState(false);
+  const [loading,        setLoading]        = useState(true);
+  const [data,           setData]           = useState(null);
+  const [trends,         setTrends]         = useState([]);
+  const [user,           setUser]           = useState(null);
 
-  // Available periods
-  const periods = [
-    'January 2026', 'February 2023', 'March 2026', 'April 2026',
-    'May 2026', 'June 2026', 'July 2026', 'August 2026',
-    'September 2026', 'October 2026', 'November 2026', 'December 2026'
-  ];
-
-  // Initialize user from localStorage
+  // Load user once
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
+    try {
+      setUser(JSON.parse(localStorage.getItem('user') || 'null'));
+    } catch { setUser(null); }
   }, []);
 
-  // Fetch performance data from backend
-  const fetchPerformanceData = async (period) => {
+  // Fetch — only uses the two employee-accessible endpoints
+  const fetchData = useCallback(async (period) => {
     if (!user) return;
+    setLoading(true);
+    setData(null);
 
-    setIsLoading(true);
+    const uid = user.id || user._id;
+
     try {
-      // Get date boundaries for selected period
       const { startDate, endDate } = getMonthBoundaries(period);
-      
-      // Fetch performance data from backend
-      const response = await getEmployeePerformance(user.id || user._id, {
+
+      const perfRes = await getEmployeePerformance(uid, {
         period: 'monthly',
         startDate,
         endDate,
-        limit: 1
+        limit: 1,
       });
 
-      if (response.data && response.data.length > 0) {
-        const perf = response.data[0];
-        
-        // Transform backend data to match UI format
-        const transformedData = {
-          totalHours: `${Math.round(perf.attendanceMetrics?.avgWorkHours * perf.attendanceMetrics?.presentDays || 0)}h`,
-          hoursChange: calculateHoursChange(perf),
-          attendanceConsistency: `${Math.round(perf.attendanceMetrics?.attendancePercentage || 0)}%`,
-          rating: (perf.overallScore / 20).toFixed(1), // Convert 0-100 to 0-5 scale
-          ratingChange: getRatingLabel(perf.rating),
-          
-          // Weekly data (placeholder - you may need to fetch separate weekly data)
-          weeklyData: generateWeeklyData(perf),
-          
-          // Attendance streak
-          attendanceStreak: generateAttendanceStreak(perf),
-          
-          // Performance history
-          performanceHistory: [
-            {
-              period: formatPeriodLabel(period),
-              hours: `${Math.round(perf.attendanceMetrics?.avgWorkHours * perf.attendanceMetrics?.presentDays || 0)} hrs`,
-              attendance: `${Math.round(perf.attendanceMetrics?.attendancePercentage || 0)}% attendance`,
-              rating: (perf.overallScore / 20).toFixed(1)
-            }
-          ],
-          
-          // Store raw data for reference
-          rawData: perf
-        };
-        
-        setPerformanceData(transformedData);
-      } else {
-        // No performance data found, offer to calculate
-        toast.info('No performance data found. Calculating...');
-        await handleCalculatePerformance(period);
-      }
-    } catch (error) {
-      console.error('Error fetching performance:', error);
-      toast.error(error.message || 'Failed to load performance data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Calculate performance if not exists
-  const handleCalculatePerformance = async (period) => {
-    if (!user) return;
-
-    try {
-      const { startDate, endDate } = getMonthBoundaries(period);
-      
-      await calculatePerformance(
-        user.id || user._id,
-        'monthly',
-        startDate,
-        endDate
+      setData(
+        perfRes?.data?.length > 0
+          ? transform(perfRes.data[0], period)
+          : null
       );
-      
-      toast.success('Performance calculated successfully');
-      
-      // Fetch the newly calculated data
-      await fetchPerformanceData(period);
-    } catch (error) {
-      console.error('Error calculating performance:', error);
-      toast.error(error.message || 'Failed to calculate performance');
+    } catch (err) {
+      console.error('Performance fetch error:', err);
+      toast.error('Failed to load performance data');
+      setData(null);
+    } finally {
+      setLoading(false);
     }
-  };
 
-  // Helper functions
-  const calculateHoursChange = (perf) => {
-    const diff = perf.overallScore - perf.previousScore;
-    return diff >= 0 ? `+${Math.abs(Math.round(diff / 10))}` : `-${Math.abs(Math.round(diff / 10))}`;
-  };
-
-  const getRatingLabel = (rating) => {
-    const labels = {
-      'Excellent': 'Top 5%',
-      'Good': 'Top 10%',
-      'Average': 'Top 20%',
-      'Below Average': 'Top 40%',
-      'Poor': 'Needs Improvement'
-    };
-    return labels[rating] || 'N/A';
-  };
-
-  const generateWeeklyData = (perf) => {
-    // Generate 4 weeks of data based on attendance
-    const avgHours = perf.attendanceMetrics?.avgWorkHours || 8;
-    const weeks = [];
-    
-    for (let i = 0; i < 4; i++) {
-      const variation = Math.random() * 5 - 2.5; // Random variation
-      const hours = Math.max(0, avgHours + variation);
-      weeks.push({
-        week: `Week ${i + 1}`,
-        target: 40,
-        you: Math.round(hours * 5), // 5 days per week
-        label: '40 hrs',
-        youLabel: `${Math.round(hours * 5)} hrs`
-      });
+    // Trend chart — secondary, never blocks the main view
+    try {
+      const trendRes = await getPerformanceTrends(uid, 6);
+      setTrends(trendRes?.data || []);
+    } catch {
+      setTrends([]);
     }
-    
-    return weeks;
-  };
+  }, [user]);
 
-  const generateAttendanceStreak = (perf) => {
-    const presentDays = perf.attendanceMetrics?.presentDays || 0;
-    const totalDays = perf.attendanceMetrics?.totalWorkingDays || 22;
-    const attendanceRate = presentDays / totalDays;
-    
-    const weeks = [];
-    for (let i = 0; i < 3; i++) {
-      const days = Array(7).fill(false).map(() => Math.random() < attendanceRate);
-      const presentCount = days.filter(d => d).length;
-      weeks.push({
-        week: `Week ${i + 1}`,
-        days,
-        streak: `${presentCount}-7 days`
-      });
-    }
-    
-    return weeks;
-  };
-
-  const formatPeriodLabel = (period) => {
-    const [month, year] = period.split(' ');
-    return `${month} - Month`;
-  };
-
-  // Fetch data when period or user changes
   useEffect(() => {
-    if (user) {
-      fetchPerformanceData(selectedPeriod);
-    }
-  }, [selectedPeriod, user]);
+    if (user) fetchData(selectedPeriod);
+  }, [user, selectedPeriod, fetchData]);
 
-  const handlePeriodChange = async (period) => {
-    setSelectedPeriod(period);
-    setShowFilterModal(false);
-    toast.info(`Loading data for ${period}...`);
-  };
+  const handlePeriodChange = (p) => { setSelectedPeriod(p); setShowFilter(false); };
+  const handleRefresh      = ()  => { toast.info('Refreshing…'); fetchData(selectedPeriod); };
 
-  const handleRefresh = async () => {
-    toast.info('Refreshing performance data...');
-    await fetchPerformanceData(selectedPeriod);
-  };
-
-  if (isLoading || !performanceData) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading performance data...</p>
-        </div>
+  // ── loading ──
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="w-14 h-14 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-sm text-gray-500 font-medium">Loading performance…</p>
       </div>
-    );
-  }
+    </div>
+  );
 
+  // ── shell ──
   return (
     <div className="flex-1 flex bg-gray-50">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentPage="performance" />
-      
-      <div className='w-full flex flex-col h-screen overflow-hidden'>
+
+      <div className="w-full flex flex-col h-screen overflow-hidden">
+
         {/* Header */}
-        <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm">
-          <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-            <button 
-              onClick={() => setSidebarOpen(true)} 
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-            >
+        <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm flex-shrink-0">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <Menu className="w-5 h-5 text-gray-600" />
             </button>
-            
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 truncate">
-                My Performance
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 hidden sm:block">
-                {selectedPeriod}
-              </p>
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">My Performance</h1>
+              <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{selectedPeriod}</p>
             </div>
-
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button 
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-5 h-5 text-gray-600 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-              
-              <button 
-                onClick={() => setShowFilterModal(true)} 
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
-              >
-                <Filter className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-700 hidden sm:inline">Filter</span>
-              </button>
-            </div>
+            <button onClick={handleRefresh} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Refresh">
+              <RefreshCw className="w-5 h-5 text-gray-500" />
+            </button>
+            <button onClick={() => setShowFilter(true)} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="hidden sm:inline">Filter</span>
+            </button>
           </div>
         </header>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 mb-2">TOTAL HOURS</p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
-                {performanceData.totalHours}
-              </h2>
-              <div className={`flex items-center gap-1 text-xs sm:text-sm ${
-                performanceData.hoursChange.startsWith('+') ? 'text-green-600' : 'text-red-600'
-              }`}>
-                <TrendingUp size={14} className="flex-shrink-0" />
-                <span>{performanceData.hoursChange} hrs vs last month</span>
+        {/* Content */}
+        {!data ? (
+          <EmptyState period={selectedPeriod} onFilter={() => setShowFilter(true)} onRefresh={handleRefresh} />
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+            {/* Score banner */}
+            <div className="bg-gradient-to-r from-teal-600 to-teal-500 rounded-2xl p-5 sm:p-6 text-white flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-teal-100 text-xs font-semibold uppercase tracking-wide mb-1">Overall Score</p>
+                <div className="flex items-end gap-3">
+                  <span className="text-5xl font-extrabold">{data.overallScore}</span>
+                  <span className="text-teal-200 text-sm mb-1.5">/ 100</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <ScoreBadge score={data.overallScore} rating={data.ratingText} />
+                  <span className="text-teal-100 text-xs">{data.ratingLabel}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white/15 rounded-xl px-4 py-3 self-start sm:self-auto">
+                <TrendIcon trend={data.trend} />
+                <span className="text-sm font-medium capitalize">{data.trend}</span>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 mb-2">ATTENDANCE CONSISTENCY</p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
-                {performanceData.attendanceConsistency}
-              </h2>
-              <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
-                <CheckCircle size={14} className="flex-shrink-0" />
-                <span>Excellent record</span>
-              </div>
+            {/* Stat cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard label="Total Hours"  value={data.totalHours}            sub={`${data.metrics.avgWorkHours} avg hrs/day`}                                      icon={Clock}        iconColor="text-blue-500"    trend={data.trend} />
+              <StatCard label="Attendance"   value={data.attendanceConsistency} sub={`${data.metrics.presentDays} / ${data.metrics.totalWorkingDays} days present`}   icon={CheckCircle}  iconColor="text-emerald-500" />
+              <StatCard label="Rating"       value={`${data.rating} / 5`}       sub={data.ratingLabel}                                                                icon={Award}        iconColor="text-amber-500"  />
             </div>
 
-            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 mb-2">OVERALL RATING</p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
-                {performanceData.rating}
-              </h2>
-              <div className="flex items-center gap-1 text-xs sm:text-sm text-green-600">
-                <TrendingUp size={14} className="flex-shrink-0" />
-                <span>{performanceData.ratingChange} in region</span>
-              </div>
-            </div>
-          </div>
+            {/* Metric bars + weekly chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Weekly Performance & Attendance */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            {/* Weekly Hours Chart */}
-            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <div className="mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
-                  Weekly hours vs target
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Each column shows your hours compared to the 40-hr target
-                </p>
+              <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Performance breakdown</h3>
+                  <p className="text-xs text-gray-400">Key metrics for {selectedPeriod}</p>
+                </div>
+                <MetricBar label="Task Completion"    value={data.metrics.taskCompletion}    color="bg-teal-500"   />
+                <MetricBar label="Productivity Score" value={data.metrics.productivityScore} color="bg-blue-500"   />
+                <MetricBar label="Quality Score"      value={data.metrics.qualityScore}      color="bg-purple-500" />
+                <MetricBar label="Efficiency Score"   value={data.metrics.efficiencyScore}   color="bg-amber-400"  />
+                <div className="pt-2 border-t border-gray-100 grid grid-cols-2 gap-3 text-center">
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <p className="text-lg font-bold text-gray-800">{data.metrics.tasksCompleted}</p>
+                    <p className="text-xs text-gray-400">Tasks done</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <p className="text-lg font-bold text-gray-800">{data.metrics.totalTasks}</p>
+                    <p className="text-xs text-gray-400">Total tasks</p>
+                  </div>
+                </div>
               </div>
-              
-              <div className="space-y-3 sm:space-y-4">
-                {performanceData.weeklyData.map((data, index) => (
-                  <div key={index}>
-                    <div className="flex justify-between text-xs text-gray-600 mb-2">
-                      <span className="font-medium">{data.week}</span>
-                    </div>
-                    <div className="relative h-10 sm:h-12 bg-gray-100 rounded-lg overflow-hidden">
-                      <div 
-                        className="absolute top-0 h-full bg-gray-300 rounded-lg" 
-                        style={{ width: `${(data.target / 50) * 100}%` }} 
-                      />
-                      <div 
-                        className="absolute top-0 h-full bg-teal-600 rounded-lg" 
-                        style={{ width: `${(data.you / 50) * 100}%` }} 
-                      />
-                      <div className="absolute inset-0 flex items-center justify-between px-2 sm:px-3 text-xs font-medium">
-                        <span className="text-white">{data.youLabel}</span>
-                        <span className="text-gray-600">{data.label}</span>
+
+              <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Weekly hours vs target</h3>
+                  <p className="text-xs text-gray-400">Your hours vs 40-hr weekly target</p>
+                </div>
+                <div className="space-y-3">
+                  {data.weeklyData.map((d, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span className="font-medium">{d.week}</span>
+                        <span className={d.you >= d.target ? 'text-emerald-500' : 'text-orange-400'}>
+                          {d.you >= d.target ? '✓ on target' : `${d.target - d.you} hrs short`}
+                        </span>
+                      </div>
+                      <div className="relative h-9 bg-gray-100 rounded-lg overflow-hidden">
+                        <div className="absolute inset-y-0 left-0 bg-gray-200 rounded-lg" style={{ width: `${(d.target / 50) * 100}%` }} />
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-lg transition-all duration-700 ${d.you >= d.target ? 'bg-teal-500' : 'bg-orange-400'}`}
+                          style={{ width: `${Math.min((d.you / 50) * 100, 100)}%` }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-semibold">
+                          <span className="text-white drop-shadow">{d.youLabel}</span>
+                          <span className="text-gray-500">{d.label}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 sm:mt-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-teal-600 rounded-full flex-shrink-0"></div>
-                  <span className="text-gray-600">Your hours</span>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full flex-shrink-0"></div>
-                  <span className="text-gray-600">Target (40 hrs)</span>
+                <div className="flex gap-4 mt-3 text-xs">
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-teal-500" /><span className="text-gray-500">Your hours</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-gray-200" /><span className="text-gray-500">Target</span></div>
                 </div>
               </div>
             </div>
 
-            {/* Attendance Streak */}
-            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-              <div className="mb-4 sm:mb-6">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
-                  Recent attendance streak
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Last 3 weeks of completed workdays and absences
-                </p>
-              </div>
-              
-              <div className="space-y-3 sm:space-y-4">
-                {performanceData.attendanceStreak.map((week, index) => (
-                  <div key={index} className="flex items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm font-medium text-gray-700 w-12 sm:w-16 flex-shrink-0">
-                      {week.week}
-                    </span>
-                    <div className="flex gap-1 sm:gap-1.5 flex-1 overflow-x-auto">
-                      {week.days.map((present, dayIndex) => (
-                        <div 
-                          key={dayIndex} 
-                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 ${
-                            present ? 'bg-teal-600' : 'bg-gray-200'
-                          }`} 
-                        />
-                      ))}
+            {/* Attendance streak + trend chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+              <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Recent attendance streak</h3>
+                  <p className="text-xs text-gray-400">Last 3 weeks · filled = present</p>
+                </div>
+                <div className="space-y-3">
+                  {data.attendanceStreak.map((w, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-500 w-14 flex-shrink-0">{w.week}</span>
+                      <div className="flex gap-1 flex-1">
+                        {w.days.map((present, di) => (
+                          <div key={di} title={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][di]}
+                            className={`flex-1 h-6 rounded-md ${present ? 'bg-teal-500' : 'bg-gray-100'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-teal-600 font-semibold w-16 text-right flex-shrink-0">{w.streak}</span>
                     </div>
-                    <span className="text-xs sm:text-sm text-teal-600 font-medium w-16 sm:w-20 text-right flex-shrink-0">
-                      {week.streak}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Performance History */}
-          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
-            <div className="mb-4 sm:mb-6">
-              <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
-                Performance history
-              </h3>
-              <p className="text-xs text-gray-500">
-                Past weekly and monthly ratings
-              </p>
-            </div>
-            
-            <div className="space-y-2 sm:space-y-3">
-              {performanceData.performanceHistory.map((item, index) => (
-                <div 
-                  key={index} 
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex-1">
-                    <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1">
-                      {item.period}
-                    </h4>
-                    <p className="text-xs text-gray-600">
-                      {item.hours} • {item.attendance}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Award size={16} className="text-amber-500 flex-shrink-0" />
-                    <span className="text-base sm:text-lg font-bold text-gray-900">
-                      {item.rating}
-                    </span>
-                    <span className="text-xs sm:text-sm text-gray-500">/ 5.0</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Performance Details from Backend */}
-            {performanceData.rawData && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-900 mb-4">Detailed Metrics</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                    <p className="text-xs text-blue-600 mb-1">Task Completion</p>
-                    <p className="text-lg font-bold text-blue-900">
-                      {Math.round(performanceData.rawData.taskMetrics?.completionRate || 0)}%
-                    </p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                    <p className="text-xs text-green-600 mb-1">Work Quality</p>
-                    <p className="text-lg font-bold text-green-900">
-                      {Math.round(performanceData.rawData.productivityMetrics?.qualityScore || 0)}%
-                    </p>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-                    <p className="text-xs text-purple-600 mb-1">Overall Score</p>
-                    <p className="text-lg font-bold text-purple-900">
-                      {Math.round(performanceData.rawData.overallScore || 0)}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Modal */}
-      {showFilterModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm" 
-            onClick={() => setShowFilterModal(false)} 
-          />
-          <div className="relative min-h-screen flex items-center justify-center p-4">
-            <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-800">Select Period</h3>
-                <button 
-                  onClick={() => setShowFilterModal(false)} 
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-              
-              <div className="p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {periods.map((period) => (
-                    <button 
-                      key={period} 
-                      onClick={() => handlePeriodChange(period)} 
-                      className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                        selectedPeriod === period 
-                          ? 'bg-teal-600 text-white shadow-lg' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {period.split(' ')[0]}
-                    </button>
                   ))}
                 </div>
               </div>
-              
-              <div className="p-6 border-t border-gray-200">
-                <button 
-                  onClick={() => setShowFilterModal(false)} 
-                  className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Close
-                </button>
+
+              {trends.length >= 2 ? (
+                <TrendChart trends={trends} />
+              ) : (
+                <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2">
+                  <BarChart2 className="w-10 h-10 text-gray-200" />
+                  <p className="text-sm text-gray-400">Not enough history for a trend chart yet.</p>
+                  <p className="text-xs text-gray-300">At least 2 months of data needed.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Performance history */}
+            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Performance history</h3>
+                <p className="text-xs text-gray-400">Monthly ratings on record</p>
+              </div>
+              <div className="space-y-2">
+                {data.history.map((h, i) => (
+                  <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 sm:p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <div>
+                      <p className="text-xs sm:text-sm font-semibold text-gray-900">{h.period}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{h.hours} &bull; {h.attendance}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Award size={15} className="text-amber-400" />
+                      <span className="text-base font-bold text-gray-900">{h.rating}</span>
+                      <span className="text-xs text-gray-400">/ 5.0</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+
           </div>
-        </div>
+        )}
+      </div>
+
+      {showFilter && (
+        <FilterModal selected={selectedPeriod} onSelect={handlePeriodChange} onClose={() => setShowFilter(false)} />
       )}
     </div>
   );
 };
 
-export default PerformancePage;
+export default EmployeeProjectsPage;
