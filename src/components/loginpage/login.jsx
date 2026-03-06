@@ -42,7 +42,7 @@ export default function LoginPage() {
             router.push('/employee/dashboard');
           } else {
             // Default redirect
-            router.push('/dashboard');
+            router.push('/');
           }
         }, 500);
       }

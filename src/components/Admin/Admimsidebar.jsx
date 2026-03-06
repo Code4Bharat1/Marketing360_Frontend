@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import {
     FiBarChart2, FiFileText, FiUsers, FiActivity,
-    FiSettings, FiLogOut, FiCheckSquare
+    FiSettings, FiLogOut, FiCheckSquare,
+    FiBriefcase,
+    FiClock
 } from 'react-icons/fi';
 import { BiPackage } from 'react-icons/bi';
 import { IoStatsChartOutline, IoTrophyOutline } from 'react-icons/io5';
@@ -15,10 +17,12 @@ const navItems = [
     { key: 'work', label: 'Work Logs', icon: FiFileText, href: '/admin/work', badge: null },
     { key: 'assign-tasks', label: 'Assign Tasks', icon: FiCheckSquare, href: '/admin/assign-tasks', badge: null },
     { key: 'employees', label: 'Employees', icon: FiUsers, href: '/admin/employees', badge: null },
-    { key: 'performance', label: 'Performance', icon: IoStatsChartOutline, href: '/admin/performance',badge: null  },
-//   { key: 'rankings', label: 'Rankings', icon: IoTrophyOutline, href: '/admin/rankings',badge: null  }
-    // { key: 'reports',   label: 'Reports',     icon: FiActivity,    href: '/admin/reports',      badge: null },
-    // { key: 'settings',  label: 'Settings',    icon: FiSettings,    href: '/admin/settings',     badge: null },
+    { key: 'projects', label: 'Projects', icon: FiBriefcase, href: '/admin/project', badge: null },
+     { key: 'timelogs', label: 'Time Logs', icon: FiClock, href: '/admin/time-logs', badge: null }, // NEW
+    { key: 'performance', label: 'Performance', icon: IoStatsChartOutline, href: '/admin/performance', badge: null },
+    // { key: 'rankings', label: 'Rankings', icon: IoTrophyOutline, href: '/admin/rankings', badge: null }
+    // { key: 'reports', label: 'Reports', icon: FiActivity, href: '/admin/reports', badge: null },
+    // { key: 'settings', label: 'Settings', icon: FiSettings, href: '/admin/settings', badge: null },
 ];
 
 export default function AdminSidebar({ collapsed = false, onToggle }) {

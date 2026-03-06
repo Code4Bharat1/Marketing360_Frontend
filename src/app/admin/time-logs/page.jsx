@@ -1,12 +1,10 @@
-
-import PerformancePage from '@/components/Admin/EmployeePerformance'
+import AdminTimeLogsPage from '@/components/Admin/AdminTimeLogsPage'
 import React from 'react'
 
 const page = () => {
   return (
     <div>
-        
-      <PerformancePage/>
+      <AdminTimeLogsPage/>
     </div>
   )
 }
