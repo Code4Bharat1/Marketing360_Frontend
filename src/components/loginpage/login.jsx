@@ -244,7 +244,7 @@ export default function LoginPage() {
 
             {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
+              {/* <div className="flex items-center">
                 <input
                   id="remember-me"
                   name="remember-me"
@@ -254,7 +254,7 @@ export default function LoginPage() {
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-700 cursor-pointer">
                   Remember me
                 </label>
-              </div>
+              </div> */}
               <a 
                 href="#" 
                 onClick={handleForgotPassword}
